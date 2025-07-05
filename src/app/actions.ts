@@ -74,13 +74,39 @@ export const signInAction = async (formData: FormData) => {
   const password = formData.get("password") as string;
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: authData, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
     return encodedRedirect("error", "/sign-in", error.message);
+  }
+
+  // Ensure user record exists in users table
+  if (authData.user) {
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", authData.user.id)
+      .single();
+
+    // If user doesn't exist in users table, create it
+    if (!existingUser) {
+      const { error: createUserError } = await supabase.from("users").insert({
+        id: authData.user.id,
+        email: authData.user.email,
+        full_name: authData.user.user_metadata?.full_name || "",
+        name: authData.user.user_metadata?.full_name || "",
+        token_identifier: authData.user.id,
+        user_id: authData.user.id,
+        created_at: new Date().toISOString(),
+      });
+
+      if (createUserError) {
+        console.error("Error creating user record:", createUserError);
+      }
+    }
   }
 
   return redirect("/dashboard");

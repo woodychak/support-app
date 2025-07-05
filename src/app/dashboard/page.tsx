@@ -31,11 +31,38 @@ export default async function Dashboard() {
   }
 
   // Get user data with company info
-  const { data: userData } = await supabase
+  const { data: userData, error: userError } = await supabase
     .from("users")
     .select("*, companies(*)")
     .eq("id", user.id)
     .single();
+
+  // If user doesn't exist in users table, create it
+  if (userError && userError.code === "PGRST116") {
+    const { error: createUserError } = await supabase.from("users").insert({
+      id: user.id,
+      email: user.email,
+      full_name: user.user_metadata?.full_name || "",
+      name: user.user_metadata?.full_name || "",
+      token_identifier: user.id,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+    });
+
+    if (createUserError) {
+      console.error("Error creating user record:", createUserError);
+    }
+
+    // Retry getting user data
+    const { data: newUserData } = await supabase
+      .from("users")
+      .select("*, companies(*)")
+      .eq("id", user.id)
+      .single();
+
+    // Use the newly created user data
+    const userData = newUserData;
+  }
 
   // Get company stats if user has a company
   let companyStats = null;
