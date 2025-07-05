@@ -31,7 +31,7 @@ export default async function Dashboard() {
   }
 
   // Get user data with company info
-  const { data: userData, error: userError } = await supabase
+  let { data: userData, error: userError } = await supabase
     .from("users")
     .select("*, companies(*)")
     .eq("id", user.id)
@@ -60,8 +60,7 @@ export default async function Dashboard() {
       .eq("id", user.id)
       .single();
 
-    // Use the newly created user data
-    const userData = newUserData;
+    userData = newUserData;
   }
 
   // Get company stats if user has a company
