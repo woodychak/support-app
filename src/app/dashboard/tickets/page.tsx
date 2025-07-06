@@ -20,6 +20,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
+import { TicketDashboardClient } from "@/components/ticket-dashboard-client";
 
 export default async function CompanyTicketsPage() {
   const supabase = await createClient();
@@ -50,6 +51,7 @@ export default async function CompanyTicketsPage() {
       `
       *,
       client_credentials(
+        id,
         username,
         full_name,
         email
@@ -59,54 +61,19 @@ export default async function CompanyTicketsPage() {
     .eq("company_id", userData.company_id)
     .order("created_at", { ascending: false });
 
+  // Get unique clients for filter dropdown
+  const { data: clients } = await supabase
+    .from("client_credentials")
+    .select("id, username, full_name, email")
+    .eq("company_id", userData.company_id)
+    .eq("is_active", true)
+    .order("full_name", { ascending: true });
+
   const ticketStats = {
     total: tickets?.length || 0,
     open: tickets?.filter((t) => t.status === "open").length || 0,
     inProgress: tickets?.filter((t) => t.status === "in_progress").length || 0,
     resolved: tickets?.filter((t) => t.status === "resolved").length || 0,
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "open":
-        return <AlertCircle className="h-4 w-4 text-orange-500" />;
-      case "in_progress":
-        return <Clock className="h-4 w-4 text-blue-500" />;
-      case "resolved":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "closed":
-        return <CheckCircle className="h-4 w-4 text-gray-500" />;
-      default:
-        return <Ticket className="h-4 w-4" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open":
-        return "bg-orange-100 text-orange-800";
-      case "in_progress":
-        return "bg-blue-100 text-blue-800";
-      case "resolved":
-        return "bg-green-100 text-green-800";
-      case "closed":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "bg-red-100 text-red-800";
-      case "medium":
-        return "bg-yellow-100 text-yellow-800";
-      case "low":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
   };
 
   return (
@@ -183,87 +150,11 @@ export default async function CompanyTicketsPage() {
             </Card>
           </div>
 
-          {/* Tickets List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>All Support Tickets</CardTitle>
-              <CardDescription>
-                View and manage all client-submitted support tickets
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!tickets || tickets.length === 0 ? (
-                <div className="text-center py-12">
-                  <Ticket className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    No tickets yet
-                  </h3>
-                  <p className="text-gray-600">
-                    When clients submit support tickets, they will appear here.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {tickets.map((ticket) => (
-                    <div
-                      key={ticket.id}
-                      className="border rounded-lg p-6 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-lg text-gray-900 mb-2">
-                            {ticket.title}
-                          </h3>
-                          <p className="text-gray-600 mb-3 line-clamp-2">
-                            {ticket.description}
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-2 ml-4">
-                          <Badge className={getStatusColor(ticket.status)}>
-                            {getStatusIcon(ticket.status)}
-                            <span className="ml-1 capitalize">
-                              {ticket.status.replace("_", " ")}
-                            </span>
-                          </Badge>
-                          <Badge
-                            variant="outline"
-                            className={getPriorityColor(ticket.priority)}
-                          >
-                            {ticket.priority} priority
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-sm text-gray-500">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            <span>
-                              {ticket.client_credentials?.full_name ||
-                                ticket.client_credentials?.username ||
-                                "Unknown Client"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>
-                              {new Date(ticket.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <Link href={`/dashboard/tickets/${ticket.id}`}>
-                          <Button variant="outline" size="sm">
-                            <MessageSquare className="h-3 w-3 mr-1" />
-                            View Details
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Client Component for Tickets with Filters */}
+          <TicketDashboardClient
+            tickets={tickets || []}
+            clients={clients || []}
+          />
         </div>
       </main>
     </>

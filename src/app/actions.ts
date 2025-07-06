@@ -289,6 +289,7 @@ export const createClientCredentialAction = async (formData: FormData) => {
     password_hash: passwordHash,
     email,
     full_name: fullName,
+    is_active: true,
   });
 
   if (error) {
@@ -304,6 +305,170 @@ export const createClientCredentialAction = async (formData: FormData) => {
     "success",
     "/dashboard/clients",
     "Client credential created successfully",
+  );
+};
+
+export const updateClientCredentialAction = async (formData: FormData) => {
+  const clientId = formData.get("client_id")?.toString();
+  const username = formData.get("username")?.toString();
+  const password = formData.get("password")?.toString();
+  const email = formData.get("email")?.toString();
+  const fullName = formData.get("full_name")?.toString();
+  const isActive = formData.get("is_active") === "on";
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!clientId || !username) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/clients",
+      "Client ID and username are required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/clients",
+      "You must have a company to update client credentials",
+    );
+  }
+
+  // Verify client belongs to user's company
+  const { data: clientData, error: clientError } = await supabase
+    .from("client_credentials")
+    .select("id")
+    .eq("id", clientId)
+    .eq("company_id", userData.company_id)
+    .single();
+
+  if (clientError || !clientData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/clients",
+      "Client credential not found or access denied",
+    );
+  }
+
+  // Prepare update data
+  const updateData: any = {
+    username,
+    email,
+    full_name: fullName,
+    is_active: isActive,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Add password hash if password is provided
+  if (password) {
+    updateData.password_hash = Buffer.from(password).toString("base64");
+  }
+
+  const { error } = await supabase
+    .from("client_credentials")
+    .update(updateData)
+    .eq("id", clientId);
+
+  if (error) {
+    console.error("Error updating client credential:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/clients",
+      "Failed to update client credential",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/clients",
+    "Client credential updated successfully",
+  );
+};
+
+export const deleteClientCredentialAction = async (formData: FormData) => {
+  const clientId = formData.get("client_id")?.toString();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!clientId) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/clients",
+      "Client ID is required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/clients",
+      "You must have a company to delete client credentials",
+    );
+  }
+
+  // Verify client belongs to user's company
+  const { data: clientData, error: clientError } = await supabase
+    .from("client_credentials")
+    .select("id")
+    .eq("id", clientId)
+    .eq("company_id", userData.company_id)
+    .single();
+
+  if (clientError || !clientData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/clients",
+      "Client credential not found or access denied",
+    );
+  }
+
+  // Delete the client credential
+  const { error } = await supabase
+    .from("client_credentials")
+    .delete()
+    .eq("id", clientId);
+
+  if (error) {
+    console.error("Error deleting client credential:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/clients",
+      "Failed to delete client credential",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/clients",
+    "Client credential deleted successfully",
   );
 };
 
@@ -404,7 +569,7 @@ export const createSupportTicketAction = async (formData: FormData) => {
   // Get client data to verify and get company_id
   const { data: clientData, error: clientError } = await supabase
     .from("client_credentials")
-    .select("company_id")
+    .select("company_id, username, full_name, email, companies(name, owner_id)")
     .eq("id", clientId)
     .eq("is_active", true)
     .single();
@@ -418,14 +583,18 @@ export const createSupportTicketAction = async (formData: FormData) => {
   }
 
   // Create the support ticket
-  const { error } = await supabase.from("support_tickets").insert({
-    title,
-    description,
-    priority,
-    status: "open",
-    company_id: clientData.company_id,
-    client_credential_id: clientId,
-  });
+  const { data: ticketData, error } = await supabase
+    .from("support_tickets")
+    .insert({
+      title,
+      description,
+      priority,
+      status: "open",
+      company_id: clientData.company_id,
+      client_credential_id: clientId,
+    })
+    .select()
+    .single();
 
   if (error) {
     console.error("Error creating support ticket:", error);
@@ -436,6 +605,116 @@ export const createSupportTicketAction = async (formData: FormData) => {
     );
   }
 
+  // Send email notification to company owner
+  const company = clientData.companies?.[0];
+  
+  if (company?.owner_id && ticketData) {
+    // Get company owner's email
+    const { data: ownerData } = await supabase
+      .from("users")
+      .select("email")
+      .eq("id", company.owner_id)
+      .single();
+
+    if (ownerData?.email) {
+      const clientName = clientData.full_name || clientData.username;
+      const subject = `New Support Ticket: ${title}`;
+      const body = `
+        A new support ticket has been created by ${clientName}.
+        
+        Ticket Details:
+        - Title: ${title}
+        - Priority: ${priority}
+        - Status: Open
+        
+        Description:
+        ${description}
+        
+        Please log in to your dashboard to respond.
+      `;
+
+      // Log the email notification in the database
+      await supabase.from("email_notifications").insert({
+        recipient_email: ownerData.email,
+        subject,
+        body,
+        status: "pending",
+        ticket_id: ticketData.id,
+      });
+
+      // In a real application, you would send the actual email here
+      // using an email service like SendGrid, AWS SES, etc.
+    }
+  }
+
+  return redirect(`/client-portal/dashboard?client_id=${clientId}`);
+};
+
+export const deleteSupportTicketAction = async (formData: FormData) => {
+  const ticketId = formData.get("ticket_id")?.toString();
+  const clientId = formData.get("client_id")?.toString(); // 方便驗證公司用
+
+  const supabase = await createClient();
+
+  if (!ticketId || !clientId) {
+    return encodedRedirect(
+      "error",
+      `/client-portal/dashboard?client_id=${clientId ?? ""}`,
+      "Missing ticket information.",
+    );
+  }
+
+  /* ① 先確認 client 有權限刪這張票 */
+  const { data: clientData, error: clientError } = await supabase
+    .from("client_credentials")
+    .select("company_id")
+    .eq("id", clientId)
+    .eq("is_active", true)
+    .single();
+
+  if (clientError || !clientData) {
+    return encodedRedirect(
+      "error",
+      `/client-portal/dashboard?client_id=${clientId}`,
+      "Invalid client credentials.",
+    );
+  }
+
+  /* ② 確認 ticket 是在同一家公司 */
+  const { data: ticketRow, error: ticketErr } = await supabase
+    .from("support_tickets")
+    .select("id, company_id")
+    .eq("id", ticketId)
+    .single();
+
+  if (
+    ticketErr ||
+    !ticketRow ||
+    ticketRow.company_id !== clientData.company_id
+  ) {
+    return encodedRedirect(
+      "error",
+      `/client-portal/dashboard?client_id=${clientId}`,
+      "Ticket not found or permission denied.",
+    );
+  }
+
+  /* ③ 執行刪除（若關聯表沒設 CASCADE 可自行手動刪） */
+  const { error: deleteError } = await supabase
+    .from("support_tickets")
+    .delete()
+    .eq("id", ticketId);
+
+  if (deleteError) {
+    console.error("Delete ticket error:", deleteError);
+    return encodedRedirect(
+      "error",
+      `/client-portal/dashboard?client_id=${clientId}`,
+      "Failed to delete ticket.",
+    );
+  }
+
+  /* ④ 刪除成功 → 回到票列表 */
   return redirect(`/client-portal/dashboard?client_id=${clientId}`);
 };
 
@@ -500,6 +779,7 @@ export const addTicketCommentAction = async (formData: FormData) => {
   const authorType = formData.get("author_type")?.toString();
   const authorId = formData.get("author_id")?.toString();
   const isInternal = formData.get("is_internal") === "true";
+  const attachments = formData.get("attachments")?.toString();
   const supabase = await createClient();
 
   if (!content || !ticketId || !authorType) {
@@ -511,13 +791,17 @@ export const addTicketCommentAction = async (formData: FormData) => {
   }
 
   // Add the comment
-  const { error } = await supabase.from("ticket_comments").insert({
-    ticket_id: ticketId,
-    content,
-    author_type: authorType,
-    author_id: authorId,
-    is_internal: isInternal,
-  });
+  const { data: commentData, error } = await supabase
+    .from("ticket_comments")
+    .insert({
+      ticket_id: ticketId,
+      content,
+      author_type: authorType,
+      author_id: authorId,
+      is_internal: isInternal,
+    })
+    .select()
+    .single();
 
   if (error) {
     console.error("Error adding comment:", error);
@@ -526,6 +810,38 @@ export const addTicketCommentAction = async (formData: FormData) => {
       `/dashboard/tickets/${ticketId}`,
       "Failed to add comment",
     );
+  }
+
+  // Process attachments if any
+  if (attachments && commentData) {
+    const attachmentPaths = attachments.split(",").filter(Boolean);
+
+    if (attachmentPaths.length > 0) {
+      const attachmentsToInsert = attachmentPaths.map((path) => {
+        const fileName = path.split("/").pop() || "unknown";
+        const fileType = fileName.includes(".")
+          ? fileName.split(".").pop() || "unknown"
+          : "unknown";
+
+        return {
+          ticket_id: ticketId,
+          comment_id: commentData.id,
+          file_path: path,
+          file_name: fileName,
+          file_type: fileType,
+          file_size: 0, // We don't have the size here, but it's required
+          created_by: authorId,
+        };
+      });
+
+      const { error: attachmentError } = await supabase
+        .from("ticket_attachments")
+        .insert(attachmentsToInsert);
+
+      if (attachmentError) {
+        console.error("Error saving attachments:", attachmentError);
+      }
+    }
   }
 
   return redirect(`/dashboard/tickets/${ticketId}`);

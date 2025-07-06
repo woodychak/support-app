@@ -1,6 +1,7 @@
-import DashboardNavbar from "@/components/dashboard-navbar";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../../supabase/server";
+import DashboardNavbar from "@/components/dashboard-navbar";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -8,10 +9,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -19,12 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
-  Ticket,
   ArrowLeft,
+  Ticket,
   MessageSquare,
-  User,
   Clock,
+  User,
+  Image as ImageIcon,
   AlertCircle,
   CheckCircle,
 } from "lucide-react";
@@ -34,11 +36,26 @@ import {
   updateTicketStatusAction,
 } from "../../../actions";
 import { FormMessage, Message } from "@/components/form-message";
+import { ImagePasteTextarea } from "@/components/image-paste-textarea";
+import { ImageViewerWrapper } from "@/components/image-viewer-wrapper";
+import { ClickableImage } from "@/components/clickable-image";
+
+function buildPublicUrl(filePath: string) {
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/attachments/${filePath}`;
+}
 
 interface TicketManagementPageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<Message>;
 }
+
+type TicketAttachment = {
+  id: string;
+  file_path: string;
+  publicUrl: string;
+  file_name?: string;
+  // 如果還有其他欄位，照填
+};
 
 export default async function TicketManagementPage({
   params,
@@ -88,12 +105,23 @@ export default async function TicketManagementPage({
     return redirect("/dashboard/tickets");
   }
 
-  // Get all comments for this ticket
-  const { data: comments } = await supabase
+  const { data: rawComments } = await supabase
     .from("ticket_comments")
-    .select("*")
+    .select("*, ticket_attachments(*)")
     .eq("ticket_id", id)
     .order("created_at", { ascending: true });
+
+  const comments =
+    rawComments?.map((comment) => ({
+      ...comment,
+      attachments:
+        comment.ticket_attachments?.map((att: TicketAttachment) => ({
+          ...att,
+          publicUrl: supabase.storage
+            .from("attachments")
+            .getPublicUrl(att.file_path).data.publicUrl,
+        })) ?? [],
+    })) ?? [];
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -140,7 +168,7 @@ export default async function TicketManagementPage({
 
   return (
     <>
-      <DashboardNavbar />
+      <ImageViewerWrapper />
       <main className="w-full">
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
@@ -261,6 +289,19 @@ export default async function TicketManagementPage({
                           <p className="text-gray-700 whitespace-pre-wrap">
                             {comment.content}
                           </p>
+                          {comment.attachments.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {comment.attachments.map((att: TicketAttachment) => (
+                                <ClickableImage
+                                  key={att.file_path}
+                                  src={att.publicUrl}
+                                  alt="Attachment"
+                                  className="max-w-xs max-h-48 rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                  fileName={att.file_name || "Attachment"}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))
                     ) : (
@@ -324,15 +365,15 @@ export default async function TicketManagementPage({
 
                       <div className="space-y-2">
                         <Label htmlFor="content">Comment *</Label>
-                        <Textarea
+                        <ImagePasteTextarea
                           id="content"
                           name="content"
                           placeholder="Type your response or internal note here..."
                           rows={4}
                           required
+                          ticketId={ticket.id}
                         />
                       </div>
-
                       <div className="flex items-center space-x-2">
                         <input
                           type="checkbox"
@@ -345,12 +386,11 @@ export default async function TicketManagementPage({
                           Internal note (not visible to client)
                         </Label>
                       </div>
-
-                      <FormMessage message={searchParamsData} />
-
-                      <Button type="submit" className="w-full">
-                        Add Comment
-                      </Button>
+                      <div className="pt-2">
+                        <Button type="submit" className="w-full">
+                          Submit Comment
+                        </Button>
+                      </div>
                     </form>
                   </CardContent>
                 </Card>

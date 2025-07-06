@@ -1,7 +1,11 @@
 import DashboardNavbar from "@/components/dashboard-navbar";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../supabase/server";
-import { createClientCredentialAction } from "@/app/actions";
+import {
+  createClientCredentialAction,
+  updateClientCredentialAction,
+  deleteClientCredentialAction,
+} from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +15,40 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { SubmitButton } from "@/components/submit-button";
 import { FormMessage, Message } from "@/components/form-message";
-import { Users, Plus, User, Mail, Calendar } from "lucide-react";
+import {
+  Users,
+  Plus,
+  User,
+  Mail,
+  Calendar,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 
 interface ClientsPageProps {
@@ -194,6 +228,121 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
                           >
                             {client.is_active ? "Active" : "Inactive"}
                           </Badge>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                <Pencil className="h-3 w-3 mr-1" />
+                                Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>
+                                  Edit Client Credential
+                                </DialogTitle>
+                                <DialogDescription>
+                                  Update client information and access settings
+                                </DialogDescription>
+                              </DialogHeader>
+                              <form
+                                action={updateClientCredentialAction}
+                                className="space-y-4"
+                              >
+                                <input
+                                  type="hidden"
+                                  name="client_id"
+                                  value={client.id}
+                                />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="username">Username *</Label>
+                                    <Input
+                                      id="username"
+                                      name="username"
+                                      defaultValue={client.username}
+                                      required
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="password">
+                                      New Password
+                                    </Label>
+                                    <Input
+                                      id="password"
+                                      name="password"
+                                      type="password"
+                                      placeholder="Leave blank to keep current"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                    <Label htmlFor="full_name">Full Name</Label>
+                                    <Input
+                                      id="full_name"
+                                      name="full_name"
+                                      defaultValue={client.full_name || ""}
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label htmlFor="email">Email</Label>
+                                    <Input
+                                      id="email"
+                                      name="email"
+                                      type="email"
+                                      defaultValue={client.email || ""}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id="is_active"
+                                    name="is_active"
+                                    defaultChecked={client.is_active}
+                                  />
+                                  <Label htmlFor="is_active">
+                                    Active account
+                                  </Label>
+                                </div>
+                                <DialogFooter>
+                                  <Button type="submit">Save Changes</Button>
+                                </DialogFooter>
+                              </form>
+                            </DialogContent>
+                          </Dialog>
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm">
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Delete
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Delete Client Credential
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this client
+                                  credential? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <form action={deleteClientCredentialAction}>
+                                  <input
+                                    type="hidden"
+                                    name="client_id"
+                                    value={client.id}
+                                  />
+                                  <Button variant="destructive" type="submit">
+                                    Delete
+                                  </Button>
+                                </form>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     </div>
