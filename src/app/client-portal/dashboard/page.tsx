@@ -16,11 +16,13 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  Archive,
 } from "lucide-react";
+import { DeleteTicketButton } from "@/components/delete-ticket-button";
 import Link from "next/link";
 
 interface ClientDashboardProps {
-  searchParams: Promise<{ client_id?: string }>;
+  searchParams: Promise<{ client_id?: string; show_closed?: string }>;
 }
 
 export default async function ClientDashboard({
@@ -28,6 +30,7 @@ export default async function ClientDashboard({
 }: ClientDashboardProps) {
   const params = await searchParams;
   const clientId = params.client_id;
+  const showClosed = params.show_closed === "true";
 
   if (!clientId) {
     return redirect("/client-portal");
@@ -47,18 +50,33 @@ export default async function ClientDashboard({
     return redirect("/client-portal");
   }
 
-  // Get client's tickets
-  const { data: tickets } = await supabase
+    // Get client's tickets (exclude closed by default)
+    let ticketsQuery = supabase
     .from("support_tickets")
     .select("*")
+    .eq("client_credential_id", clientId);
+
+  if (!showClosed) {
+    ticketsQuery = ticketsQuery.neq("status", "closed");
+  }
+
+  const { data: tickets } = await ticketsQuery.order("created_at", {
+    ascending: false,
+  });
+
+  // Get closed tickets count for the button
+  const { data: closedTickets } = await supabase
+    .from("support_tickets")
+    .select("id")
     .eq("client_credential_id", clientId)
-    .order("created_at", { ascending: false });
+    .eq("status", "closed");
 
   const ticketStats = {
     total: tickets?.length || 0,
     open: tickets?.filter((t) => t.status === "open").length || 0,
     inProgress: tickets?.filter((t) => t.status === "in_progress").length || 0,
     resolved: tickets?.filter((t) => t.status === "resolved").length || 0,
+    closed: closedTickets?.length || 0,
   };
 
   const getStatusIcon = (status: string) => {
@@ -105,12 +123,29 @@ export default async function ClientDashboard({
                 {clientData.companies?.name} Support Portal
               </p>
             </div>
+            <div className="flex gap-2">
             <Link href={`/client-portal/tickets/new?client_id=${clientId}`}>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
                 New Ticket
               </Button>
             </Link>
+            {!showClosed && ticketStats.closed > 0 && (
+                <Link
+                  href={`/client-portal/dashboard?client_id=${clientId}&show_closed=true`}
+                >
+                  <Button variant="outline">
+                    <Archive className="h-4 w-4 mr-2" />
+                    Show Closed ({ticketStats.closed})
+                  </Button>
+                </Link>
+              )}
+              {showClosed && (
+                <Link href={`/client-portal/dashboard?client_id=${clientId}`}>
+                  <Button variant="outline">Hide Closed</Button>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -180,9 +215,14 @@ export default async function ClientDashboard({
           {/* Recent Tickets */}
           <Card>
             <CardHeader>
-              <CardTitle>Your Support Tickets</CardTitle>
+            <CardTitle>
+                Your Support Tickets
+                {showClosed && " (Including Closed)"}
+              </CardTitle>
               <CardDescription>
-                Track the status of your support requests
+                {showClosed
+                  ? "All your support requests including closed tickets"
+                  : "Track the status of your active support requests"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -235,6 +275,7 @@ export default async function ClientDashboard({
                           Created{" "}
                           {new Date(ticket.created_at).toLocaleDateString()}
                         </span>
+                        <div className="flex items-center gap-2">
                         <Link
                           href={`/client-portal/tickets/${ticket.id}?client_id=${clientId}`}
                           className="text-blue-600 hover:underline flex items-center gap-1"
@@ -242,6 +283,15 @@ export default async function ClientDashboard({
                           <MessageSquare className="h-3 w-3" />
                           View Details
                         </Link>
+                        {(ticket.status === "open" ||
+                            ticket.status === "in_progress") && (
+                            <DeleteTicketButton
+                              ticketId={ticket.id}
+                              clientId={clientId}
+                              ticketTitle={ticket.title}
+                            />
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

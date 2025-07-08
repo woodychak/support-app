@@ -121,6 +121,28 @@ export default async function NewTicketPage({
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="staff_name">Staff Name *</Label>
+                  <Input
+                    id="staff_name"
+                    name="staff_name"
+                    type="text"
+                    placeholder="Name of the staff member you're reporting about"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="staff_email">Staff Email *</Label>
+                  <Input
+                    id="staff_email"
+                    name="staff_email"
+                    type="email"
+                    placeholder="Email of the staff member"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="description">Description *</Label>
                   <Textarea
                     id="description"
@@ -136,6 +158,20 @@ export default async function NewTicketPage({
                     Tips for better support:
                   </h3>
                   <ul className="text-sm text-blue-800 space-y-1">
+                  <li>
+                      • Download SOS from{" "}
+                      <a
+                        href="https://sos.splashtop.com/"
+                        style={{
+                          color: "#007BFF",
+                          textDecoration: "underline",
+                          fontWeight: "bold",
+                        }}
+                        target="_blank"
+                      >
+                        HERE
+                      </a>
+                    </li>
                     <li>• Be specific about what you were trying to do</li>
                     <li>• Include any error messages you received</li>
                     <li>• Mention your browser/device if relevant</li>

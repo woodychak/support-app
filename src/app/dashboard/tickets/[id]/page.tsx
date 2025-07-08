@@ -36,6 +36,7 @@ import {
   updateTicketStatusAction,
 } from "../../../actions";
 import { FormMessage, Message } from "@/components/form-message";
+import { DeleteCommentButton } from "@/components/delete-comment-button";
 import { ImagePasteTextarea } from "@/components/image-paste-textarea";
 import { ImageViewerWrapper } from "@/components/image-viewer-wrapper";
 import { ClickableImage } from "@/components/clickable-image";
@@ -219,6 +220,20 @@ export default async function TicketManagementPage({
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="font-medium mb-2">Staff Name</h3>
+                      <p className="text-gray-700">
+                        {ticket.staff_name || "Not provided"}
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="font-medium mb-2">Staff Email</h3>
+                      <p className="text-gray-700">
+                        {ticket.staff_email || "Not provided"}
+                      </p>
+                    </div>
+                  </div>
                   <div>
                     <h3 className="font-medium mb-2">Description</h3>
                     <div className="bg-gray-50 p-4 rounded-lg">
@@ -266,7 +281,8 @@ export default async function TicketManagementPage({
                                 : "bg-green-50 border-l-4 border-green-200"
                           }`}
                         >
-                          <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
                             <User className="h-4 w-4" />
                             <span className="font-medium">
                               {comment.author_type === "client"
@@ -285,6 +301,16 @@ export default async function TicketManagementPage({
                                 Internal
                               </Badge>
                             )}
+                            </div>
+                            {comment.author_type === "staff" &&
+                              comment.author_id === user.id && (
+                                <DeleteCommentButton
+                                  commentId={comment.id}
+                                  ticketId={ticket.id}
+                                  authorId={user.id}
+                                  authorType="staff"
+                                />
+                              )}
                           </div>
                           <p className="text-gray-700 whitespace-pre-wrap">
                             {comment.content}
