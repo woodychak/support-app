@@ -58,7 +58,7 @@ export function DeleteCommentButton({
     <Button
       type="button"
       variant="ghost"
-      size={size}
+      size={"sm"}
       onClick={handleDelete}
       disabled={isDeleting}
       className="text-red-600 hover:text-red-800 hover:bg-red-50 p-1 h-auto"
