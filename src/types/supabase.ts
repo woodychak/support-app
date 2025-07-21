@@ -4,268 +4,504 @@ export type Json =
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[];
+  | Json[]
 
 export type Database = {
+  // Allows to automatically instanciate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
   public: {
     Tables: {
       client_credentials: {
         Row: {
-          company_id: string;
-          created_at: string;
-          email: string | null;
-          full_name: string | null;
-          id: string;
-          is_active: boolean | null;
-          password_hash: string;
-          updated_at: string | null;
-          username: string;
-        };
+          company_id: string
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          is_active: boolean | null
+          password_hash: string
+          updated_at: string | null
+          username: string
+        }
         Insert: {
-          company_id: string;
-          created_at?: string;
-          email?: string | null;
-          full_name?: string | null;
-          id?: string;
-          is_active?: boolean | null;
-          password_hash: string;
-          updated_at?: string | null;
-          username: string;
-        };
+          company_id: string
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          password_hash: string
+          updated_at?: string | null
+          username: string
+        }
         Update: {
-          company_id?: string;
-          created_at?: string;
-          email?: string | null;
-          full_name?: string | null;
-          id?: string;
-          is_active?: boolean | null;
-          password_hash?: string;
-          updated_at?: string | null;
-          username?: string;
-        };
+          company_id?: string
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          password_hash?: string
+          updated_at?: string | null
+          username?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "client_credentials_company_id_fkey";
-            columns: ["company_id"];
-            isOneToOne: false;
-            referencedRelation: "companies";
-            referencedColumns: ["id"];
+            foreignKeyName: "client_credentials_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
+      comment_attachments: {
+        Row: {
+          comment_id: string
+          created_at: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          ticket_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          ticket_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          ticket_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_attachments_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
-          created_at: string;
-          description: string | null;
-          id: string;
-          logo_url: string | null;
-          name: string;
-          owner_id: string;
-          updated_at: string | null;
-        };
+          created_at: string
+          description: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          owner_id: string
+          smtp_from_email: string | null
+          smtp_from_name: string | null
+          smtp_host: string | null
+          smtp_password: string | null
+          smtp_port: number | null
+          smtp_provider: string | null
+          smtp_use_tls: boolean | null
+          smtp_username: string | null
+          updated_at: string | null
+        }
         Insert: {
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          logo_url?: string | null;
-          name: string;
-          owner_id: string;
-          updated_at?: string | null;
-        };
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          owner_id: string
+          smtp_from_email?: string | null
+          smtp_from_name?: string | null
+          smtp_host?: string | null
+          smtp_password?: string | null
+          smtp_port?: number | null
+          smtp_provider?: string | null
+          smtp_use_tls?: boolean | null
+          smtp_username?: string | null
+          updated_at?: string | null
+        }
         Update: {
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          logo_url?: string | null;
-          name?: string;
-          owner_id?: string;
-          updated_at?: string | null;
-        };
-        Relationships: [];
-      };
+          created_at?: string
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          smtp_from_email?: string | null
+          smtp_from_name?: string | null
+          smtp_host?: string | null
+          smtp_password?: string | null
+          smtp_port?: number | null
+          smtp_provider?: string | null
+          smtp_use_tls?: boolean | null
+          smtp_username?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      email_notifications: {
+        Row: {
+          body: string
+          created_at: string | null
+          id: string
+          recipient_email: string
+          sent_at: string | null
+          status: string
+          subject: string
+          ticket_id: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          id?: string
+          recipient_email: string
+          sent_at?: string | null
+          status?: string
+          subject: string
+          ticket_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          id?: string
+          recipient_email?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_notifications_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onsite_support: {
+        Row: {
+          check_in_time: string | null
+          check_out_time: string | null
+          client_credential_id: string | null
+          company_id: string
+          created_at: string | null
+          engineer_name: string
+          id: string
+          job_details: string | null
+          updated_at: string | null
+          work_date: string
+        }
+        Insert: {
+          check_in_time?: string | null
+          check_out_time?: string | null
+          client_credential_id?: string | null
+          company_id: string
+          created_at?: string | null
+          engineer_name: string
+          id?: string
+          job_details?: string | null
+          updated_at?: string | null
+          work_date: string
+        }
+        Update: {
+          check_in_time?: string | null
+          check_out_time?: string | null
+          client_credential_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          engineer_name?: string
+          id?: string
+          job_details?: string | null
+          updated_at?: string | null
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onsite_support_client_credential_id_fkey"
+            columns: ["client_credential_id"]
+            isOneToOne: false
+            referencedRelation: "client_credentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onsite_support_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_tickets: {
         Row: {
-          assigned_to: string | null;
-          client_credential_id: string | null;
-          company_id: string;
-          created_at: string;
-          description: string;
-          id: string;
-          priority: string;
-          staff_email: string | null;
-          staff_name: string | null;
-          status: string;
-          title: string;
-          updated_at: string | null;
-        };
+          assigned_to: string | null
+          client_credential_id: string | null
+          company_id: string
+          created_at: string
+          description: string
+          id: string
+          priority: string
+          staff_email: string | null
+          staff_name: string | null
+          status: string
+          title: string
+          updated_at: string | null
+        }
         Insert: {
-          assigned_to?: string | null;
-          client_credential_id?: string | null;
-          company_id: string;
-          created_at?: string;
-          description: string;
-          id?: string;
-          priority?: string;
-          staff_email?: string | null;
-          staff_name?: string | null;
-          status?: string;
-          title: string;
-          updated_at?: string | null;
-        };
+          assigned_to?: string | null
+          client_credential_id?: string | null
+          company_id: string
+          created_at?: string
+          description: string
+          id?: string
+          priority?: string
+          staff_email?: string | null
+          staff_name?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
         Update: {
-          assigned_to?: string | null;
-          client_credential_id?: string | null;
-          company_id?: string;
-          created_at?: string;
-          description?: string;
-          id?: string;
-          priority?: string;
-          staff_email?: string | null;
-          staff_name?: string | null;
-          status?: string;
-          title?: string;
-          updated_at?: string | null;
-        };
+          assigned_to?: string | null
+          client_credential_id?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          priority?: string
+          staff_email?: string | null
+          staff_name?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "support_tickets_client_credential_id_fkey";
-            columns: ["client_credential_id"];
-            isOneToOne: false;
-            referencedRelation: "client_credentials";
-            referencedColumns: ["id"];
+            foreignKeyName: "support_tickets_client_credential_id_fkey"
+            columns: ["client_credential_id"]
+            isOneToOne: false
+            referencedRelation: "client_credentials"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "support_tickets_company_id_fkey";
-            columns: ["company_id"];
-            isOneToOne: false;
-            referencedRelation: "companies";
-            referencedColumns: ["id"];
+            foreignKeyName: "support_tickets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
+      ticket_attachments: {
+        Row: {
+          comment_id: string | null
+          created_at: string
+          created_by: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          ticket_id: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          ticket_id: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          ticket_id?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_attachments_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_attachments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_comments: {
         Row: {
-          author_id: string | null;
-          author_type: string;
-          content: string;
-          created_at: string;
-          id: string;
-          is_internal: boolean | null;
-          ticket_id: string;
-        };
+          author_id: string | null
+          author_type: string
+          content: string
+          created_at: string
+          id: string
+          is_internal: boolean | null
+          ticket_id: string
+        }
         Insert: {
-          author_id?: string | null;
-          author_type: string;
-          content: string;
-          created_at?: string;
-          id?: string;
-          is_internal?: boolean | null;
-          ticket_id: string;
-        };
+          author_id?: string | null
+          author_type: string
+          content: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean | null
+          ticket_id: string
+        }
         Update: {
-          author_id?: string | null;
-          author_type?: string;
-          content?: string;
-          created_at?: string;
-          id?: string;
-          is_internal?: boolean | null;
-          ticket_id?: string;
-        };
+          author_id?: string | null
+          author_type?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean | null
+          ticket_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "ticket_comments_ticket_id_fkey";
-            columns: ["ticket_id"];
-            isOneToOne: false;
-            referencedRelation: "support_tickets";
-            referencedColumns: ["id"];
+            foreignKeyName: "ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
           },
-        ];
-      };
+        ]
+      }
       users: {
         Row: {
-          avatar_url: string | null;
-          company_id: string | null;
-          created_at: string;
-          email: string | null;
-          full_name: string | null;
-          id: string;
-          image: string | null;
-          name: string | null;
-          token_identifier: string;
-          updated_at: string | null;
-          user_id: string | null;
-          user_type: string | null;
-        };
+          avatar_url: string | null
+          company_id: string | null
+          created_at: string
+          email: string | null
+          email_confirmed: boolean | null
+          full_name: string | null
+          id: string
+          image: string | null
+          name: string | null
+          token_identifier: string
+          updated_at: string | null
+          user_id: string | null
+          user_type: string | null
+        }
         Insert: {
-          avatar_url?: string | null;
-          company_id?: string | null;
-          created_at?: string;
-          email?: string | null;
-          full_name?: string | null;
-          id: string;
-          image?: string | null;
-          name?: string | null;
-          token_identifier: string;
-          updated_at?: string | null;
-          user_id?: string | null;
-          user_type?: string | null;
-        };
+          avatar_url?: string | null
+          company_id?: string | null
+          created_at?: string
+          email?: string | null
+          email_confirmed?: boolean | null
+          full_name?: string | null
+          id: string
+          image?: string | null
+          name?: string | null
+          token_identifier: string
+          updated_at?: string | null
+          user_id?: string | null
+          user_type?: string | null
+        }
         Update: {
-          avatar_url?: string | null;
-          company_id?: string | null;
-          created_at?: string;
-          email?: string | null;
-          full_name?: string | null;
-          id?: string;
-          image?: string | null;
-          name?: string | null;
-          token_identifier?: string;
-          updated_at?: string | null;
-          user_id?: string | null;
-          user_type?: string | null;
-        };
+          avatar_url?: string | null
+          company_id?: string | null
+          created_at?: string
+          email?: string | null
+          email_confirmed?: boolean | null
+          full_name?: string | null
+          id?: string
+          image?: string | null
+          name?: string | null
+          token_identifier?: string
+          updated_at?: string | null
+          user_id?: string | null
+          user_type?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "users_company_id_fkey";
-            columns: ["company_id"];
-            isOneToOne: false;
-            referencedRelation: "companies";
-            referencedColumns: ["id"];
+            foreignKeyName: "users_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
           },
-        ];
-      };
-    };
+        ]
+      }
+    }
     Views: {
-      [_ in never]: never;
-    };
+      [_ in never]: never
+    }
     Functions: {
-      [_ in never]: never;
-    };
+      [_ in never]: never
+    }
     Enums: {
-      [_ in never]: never;
-    };
+      [_ in never]: never
+    }
     CompositeTypes: {
-      [_ in never]: never;
-    };
-  };
-};
+      [_ in never]: never
+    }
+  }
+}
 
-type DefaultSchema = Database[Extract<keyof Database, "public">];
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R;
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
     }
     ? R
     : never
@@ -273,90 +509,98 @@ export type Tables<
         DefaultSchema["Views"])
     ? (DefaultSchema["Tables"] &
         DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R;
+        Row: infer R
       }
       ? R
       : never
-    : never;
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I;
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I;
+        Insert: infer I
       }
       ? I
       : never
-    : never;
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U;
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U;
+        Update: infer U
       }
       ? U
       : never
-    : never;
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never;
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database;
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never;
+    : never
 
 export const Constants = {
   public: {
     Enums: {},
   },
-} as const;
+} as const

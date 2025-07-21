@@ -17,6 +17,7 @@ import {
   CheckCircle,
   AlertCircle,
   Archive,
+  FileText,
 } from "lucide-react";
 import { DeleteTicketButton } from "@/components/delete-ticket-button";
 import Link from "next/link";
@@ -50,8 +51,8 @@ export default async function ClientDashboard({
     return redirect("/client-portal");
   }
 
-    // Get client's tickets (exclude closed by default)
-    let ticketsQuery = supabase
+  // Get client's tickets (exclude closed by default)
+  let ticketsQuery = supabase
     .from("support_tickets")
     .select("*")
     .eq("client_credential_id", clientId);
@@ -124,13 +125,21 @@ export default async function ClientDashboard({
               </p>
             </div>
             <div className="flex gap-2">
-            <Link href={`/client-portal/tickets/new?client_id=${clientId}`}>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Ticket
-              </Button>
-            </Link>
-            {!showClosed && ticketStats.closed > 0 && (
+              <Link href={`/client-portal/tickets/new?client_id=${clientId}`}>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Ticket
+                </Button>
+              </Link>
+              <Link
+                href={`/client-portal/onsite-support?client_id=${clientId}`}
+              >
+                <Button variant="outline">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Onsite Reports
+                </Button>
+              </Link>
+              {!showClosed && ticketStats.closed > 0 && (
                 <Link
                   href={`/client-portal/dashboard?client_id=${clientId}&show_closed=true`}
                 >
@@ -215,7 +224,7 @@ export default async function ClientDashboard({
           {/* Recent Tickets */}
           <Card>
             <CardHeader>
-            <CardTitle>
+              <CardTitle>
                 Your Support Tickets
                 {showClosed && " (Including Closed)"}
               </CardTitle>
@@ -276,14 +285,14 @@ export default async function ClientDashboard({
                           {new Date(ticket.created_at).toLocaleDateString()}
                         </span>
                         <div className="flex items-center gap-2">
-                        <Link
-                          href={`/client-portal/tickets/${ticket.id}?client_id=${clientId}`}
-                          className="text-blue-600 hover:underline flex items-center gap-1"
-                        >
-                          <MessageSquare className="h-3 w-3" />
-                          View Details
-                        </Link>
-                        {(ticket.status === "open" ||
+                          <Link
+                            href={`/client-portal/tickets/${ticket.id}?client_id=${clientId}`}
+                            className="text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                            View Details
+                          </Link>
+                          {(ticket.status === "open" ||
                             ticket.status === "in_progress") && (
                             <DeleteTicketButton
                               ticketId={ticket.id}

@@ -10,7 +10,14 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
-import { UserCircle, Building2, Users, Ticket, Home } from "lucide-react";
+import {
+  UserCircle,
+  Building2,
+  Users,
+  Ticket,
+  Home,
+  Wrench,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function DashboardNavbar() {
@@ -52,6 +59,20 @@ export default function DashboardNavbar() {
               <Ticket className="h-4 w-4" />
               Tickets
             </Link>
+            <Link
+              href="/dashboard/onsite-support"
+              className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
+            >
+              <Wrench className="h-4 w-4" />
+              Onsite Support
+            </Link>
+            <Link
+              href="/dashboard/staff"
+              className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1"
+            >
+              <UserCircle className="h-4 w-4" />
+              Staff
+            </Link>
           </div>
         </div>
         <div className="flex gap-4 items-center">
@@ -84,6 +105,18 @@ export default function DashboardNavbar() {
                 <Link href="/dashboard/tickets">
                   <Ticket className="h-4 w-4 mr-2" />
                   Tickets
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/onsite-support">
+                  <Wrench className="h-4 w-4 mr-2" />
+                  Onsite Support
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/staff">
+                  <UserCircle className="h-4 w-4 mr-2" />
+                  Staff
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />

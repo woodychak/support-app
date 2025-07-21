@@ -4,6 +4,7 @@ import { encodedRedirect } from "@/utils/utils";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "../../supabase/server";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
@@ -618,7 +619,7 @@ export const createSupportTicketAction = async (formData: FormData) => {
 
   // Send email notification to company owner
   const company = clientData.companies?.[0];
-  
+
   if (company?.owner_id && ticketData) {
     // Get company owner's email
     const { data: ownerData } = await supabase
@@ -971,4 +972,996 @@ export const deleteTicketCommentAction = async (formData: FormData) => {
       ? `/client-portal/tickets/${ticketId}?client_id=${clientId}`
       : `/dashboard/tickets/${ticketId}`;
   return redirect(redirectPath);
+};
+
+// Onsite Support Actions
+export const addOnsiteSupportAction = async (formData: FormData) => {
+  const engineerName = formData.get("engineer_name")?.toString();
+  const workDate = formData.get("work_date")?.toString();
+  const checkInTime = formData.get("check_in_time")?.toString();
+  const checkOutTime = formData.get("check_out_time")?.toString();
+  const jobDetails = formData.get("job_details")?.toString();
+  const clientId = formData.get("client_id")?.toString();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!engineerName || !workDate) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "Engineer name and work date are required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "You must have a company to add onsite support records",
+    );
+  }
+
+  // Verify client belongs to user's company if client is selected
+  if (clientId) {
+    const { data: clientData, error: clientError } = await supabase
+      .from("client_credentials")
+      .select("id")
+      .eq("id", clientId)
+      .eq("company_id", userData.company_id)
+      .single();
+
+    if (clientError || !clientData) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/onsite-support",
+        "Invalid client selection",
+      );
+    }
+  }
+
+  const { error } = await supabase.from("onsite_support").insert({
+    engineer_name: engineerName,
+    work_date: workDate,
+    check_in_time: checkInTime || null,
+    check_out_time: checkOutTime || null,
+    job_details: jobDetails || null,
+    client_credential_id: clientId || null,
+    company_id: userData.company_id,
+  });
+
+  if (error) {
+    console.error("Error adding onsite support record:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "Failed to add onsite support record",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/onsite-support",
+    "Onsite support record added successfully",
+  );
+};
+
+export const deleteOnsiteSupportAction = async (formData: FormData) => {
+  const recordId = formData.get("record_id")?.toString();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!recordId) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "Record ID is required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "You must have a company to delete onsite support records",
+    );
+  }
+
+  // Verify record belongs to user's company
+  const { data: recordData, error: recordError } = await supabase
+    .from("onsite_support")
+    .select("id")
+    .eq("id", recordId)
+    .eq("company_id", userData.company_id)
+    .single();
+
+  if (recordError || !recordData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "Record not found or access denied",
+    );
+  }
+
+  // Delete the record
+  const { error } = await supabase
+    .from("onsite_support")
+    .delete()
+    .eq("id", recordId);
+
+  if (error) {
+    console.error("Error deleting onsite support record:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "Failed to delete onsite support record",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/onsite-support",
+    "Onsite support record deleted successfully",
+  );
+};
+
+// Staff Account Actions
+export const createStaffAccountAction = async (formData: FormData) => {
+  console.log("✅ createStaffAccountAction called");
+
+  const email = formData.get("email")?.toString().trim().toLowerCase();
+  const fullName = formData.get("full_name")?.toString().trim();
+  const userType = formData.get("user_type")?.toString().trim();
+  const password = formData.get("password")?.toString();
+
+  // 基本欄位檢查
+  if (!email || !fullName || !userType || !password) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Missing required fields.",
+    );
+  }
+
+  // Email 格式驗證
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Invalid email format.",
+    );
+  }
+
+  // 密碼長度檢查
+  if (password.length < 8) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Password must be at least 8 characters.",
+    );
+  }
+
+  const supabase = await createClient();
+
+  // 取得目前登入用戶
+  const {
+    data: { user },
+    error: getUserError,
+  } = await supabase.auth.getUser();
+  console.log("Current logged in user ID:", user?.id);
+
+  if (!user || getUserError) {
+    console.error("Failed to get current user:", getUserError);
+    return encodedRedirect("error", "/dashboard", "You must be logged in.");
+  }
+
+  // 取得目前用戶資料 (檢查公司及權限)
+  const { data: currentUserData, error: currentUserError } = await supabase
+    .from("users")
+    .select("company_id, user_type")
+    .eq("id", user.id)
+    .single();
+
+  if (currentUserError || !currentUserData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Missing company or user data.",
+    );
+  }
+
+  if (currentUserData.user_type !== "admin") {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Only administrators can create staff accounts.",
+    );
+  }
+
+  // 檢查 Auth 內是否已有此 email 使用者
+  const { data: listUsersData, error: listUsersError } =
+  await supabaseAdmin.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+
+if (listUsersError) {
+  console.error("Failed to list users:", listUsersError);
+  return encodedRedirect(
+    "error",
+    "/dashboard/staff",
+    "Failed to check existing users."
+  );
+}
+
+const userExists = listUsersData?.users.some((user) => user.email === email);
+
+if (userExists) {
+  return encodedRedirect(
+    "error",
+    "/dashboard/staff",
+    "User already exists with this email."
+  );
+}
+
+  try {
+    console.log("🔧 Creating auth user:", email);
+
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: fullName, email },
+      });
+
+    if (authError) {
+      console.error("❌ Auth user creation error:", authError);
+      // 直接呼叫 encodedRedirect，跳轉後不會繼續往下執行
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        `Auth error: ${authError.message}`,
+      );
+    }
+
+    if (!authData?.user) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        "No user data returned from auth API.",
+      );
+    }
+
+    // Also update the company_id as a backup
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({
+        company_id: currentUserData.company_id,
+        user_type: userType,
+        email_confirmed: true,
+      })
+      .eq("id", authData.user.id);
+
+    if (updateError) {
+      console.error("❌ Failed to update user info:", updateError);
+      // This is just a backup update, so we don't fail if it doesn't work
+      // since we already inserted the data above
+    }
+
+    return encodedRedirect(
+      "success",
+      "/dashboard/staff",
+      "Staff account created successfully.",
+    );
+  } catch (err) {
+    // 如果是 Next.js redirect 拋錯就不處理，直接拋出
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "digest" in err &&
+      typeof (err as any).digest === "string" &&
+      (err as any).digest.startsWith("NEXT_REDIRECT")
+    ) {
+      throw err;
+    }
+    console.error("❗ Unexpected error:", err);
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Unexpected error occurred.",
+    );
+  }
+};
+
+export const updateStaffAccountAction = async (formData: FormData) => {
+  const staffId = formData.get("staff_id")?.toString();
+  const fullName = formData.get("full_name")?.toString();
+  const userType = formData.get("user_type")?.toString();
+  const email = formData.get("email")?.toString();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: getUserError,
+  } = await supabase.auth.getUser();
+
+  if (!user || getUserError) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!staffId || !fullName || !userType) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Staff ID, full name, and user type are required",
+    );
+  }
+
+  // Validate email format if provided
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        "Invalid email format",
+      );
+    }
+  }
+
+  // Use supabaseAdmin to get current user data
+  const { data: currentUserData, error: userError } = await supabaseAdmin
+    .from("users")
+    .select("company_id, user_type")
+    .eq("id", user.id)
+    .single();
+
+  if (userError || !currentUserData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "You must have a company to update staff accounts",
+    );
+  }
+
+  if (currentUserData.user_type !== "admin") {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Only administrators can update staff accounts",
+    );
+  }
+
+  // Use supabaseAdmin to verify staff member exists and belongs to same company
+  const { data: staffData, error: staffError } = await supabaseAdmin
+    .from("users")
+    .select("id, company_id, email")
+    .eq("id", staffId)
+    .single();
+
+  if (staffError || !staffData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Staff member not found",
+    );
+  }
+
+  if (staffData.company_id !== currentUserData.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Access denied - staff member not in your company",
+    );
+  }
+
+  try {
+    // Update email in Supabase Auth if email is provided and different
+    if (email && email !== staffData.email) {
+      const { error: authUpdateError } =
+        await supabaseAdmin.auth.admin.updateUserById(staffId, {
+          email: email,
+        });
+
+      if (authUpdateError) {
+        console.error("Error updating auth email:", authUpdateError);
+        return encodedRedirect(
+          "error",
+          "/dashboard/staff",
+          "Failed to update email in authentication system",
+        );
+      }
+    }
+
+    // Update user data in users table
+    const updateData: any = {
+      full_name: fullName,
+      name: fullName,
+      user_type: userType,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Add email to update data if provided
+    if (email) {
+      updateData.token_identifier = email;
+      updateData.email = email;
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update(updateData)
+      .eq("id", staffId);
+
+    if (updateError) {
+      console.error("Error updating staff account:", updateError);
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        "Failed to update staff account",
+      );
+    }
+
+    return encodedRedirect(
+      "success",
+      "/dashboard/staff",
+      "Staff account updated successfully",
+    );
+  } catch (err) {
+    // 如果是 Next.js redirect 拋錯就不處理，直接拋出
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "digest" in err &&
+      typeof (err as any).digest === "string" &&
+      (err as any).digest.startsWith("NEXT_REDIRECT")
+    ) {
+      throw err;
+    }
+    console.error("Unexpected error updating staff:", err);
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "An unexpected error occurred while updating the staff account",
+    );
+  }
+};
+
+export const deleteStaffAccountAction = async (formData: FormData) => {
+  const staffId = formData.get("staff_id")?.toString();
+  const currentUserId = formData.get("current_user_id")?.toString();
+
+  if (!staffId || !currentUserId) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Missing required data",
+    );
+  }
+
+  try {
+    // Use supabaseAdmin to check current user permissions
+    const { data: currentUser, error: currentUserError } = await supabaseAdmin
+      .from("users")
+      .select("company_id, user_type")
+      .eq("id", currentUserId)
+      .single();
+
+    if (currentUserError || !currentUser) {
+      console.error("Error fetching current user:", currentUserError);
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        "Failed to verify user permissions",
+      );
+    }
+
+    if (currentUser.user_type !== "admin") {
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        "Only administrators can delete staff accounts",
+      );
+    }
+
+    // Use supabaseAdmin to get staff user data
+    const { data: staffUser, error: staffUserError } = await supabaseAdmin
+      .from("users")
+      .select("id, user_id, company_id, email")
+      .eq("id", staffId)
+      .single();
+
+    if (staffUserError || !staffUser) {
+      console.error("Error fetching staff user:", staffUserError);
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        "Staff member not found",
+      );
+    }
+
+    if (staffUser.company_id !== currentUser.company_id) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        "Access denied - staff member not in your company",
+      );
+    }
+
+    // 1. Delete Auth User (using Supabase Admin)
+    if (staffUser.user_id || staffUser.id) {
+      const userIdToDelete = staffUser.user_id || staffUser.id;
+      const { error: authError } =
+        await supabaseAdmin.auth.admin.deleteUser(userIdToDelete);
+      if (authError) {
+        console.error("Error deleting auth user:", authError);
+      }
+    }
+
+    // 2. Delete users table record
+    const { error: deleteError } = await supabaseAdmin
+      .from("users")
+      .delete()
+      .eq("id", staffId);
+
+    if (deleteError) {
+      console.error("Error deleting user record:", deleteError);
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        "Failed to delete user record from database",
+      );
+    }
+
+    return encodedRedirect(
+      "success",
+      "/dashboard/staff",
+      "Staff account deleted successfully",
+    );
+  } catch (err) {
+    // 如果是 Next.js redirect 拋錯就不處理，直接拋出
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "digest" in err &&
+      typeof (err as any).digest === "string" &&
+      (err as any).digest.startsWith("NEXT_REDIRECT")
+    ) {
+      throw err;
+    }
+    console.error("Unexpected error deleting staff:", err);
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "An unexpected error occurred while deleting the staff account",
+    );
+  }
+};
+
+export const updateOnsiteSupportAction = async (formData: FormData) => {
+  const recordId = formData.get("record_id")?.toString();
+  const engineerName = formData.get("engineer_name")?.toString();
+  const workDate = formData.get("work_date")?.toString();
+  const checkInTime = formData.get("check_in_time")?.toString();
+  const checkOutTime = formData.get("check_out_time")?.toString();
+  const jobDetails = formData.get("job_details")?.toString();
+  const clientId = formData.get("client_id")?.toString();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!recordId || !engineerName || !workDate) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "Record ID, engineer name and work date are required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "You must have a company to update onsite support records",
+    );
+  }
+
+  // Verify record belongs to user's company
+  const { data: recordData, error: recordError } = await supabase
+    .from("onsite_support")
+    .select("id")
+    .eq("id", recordId)
+    .eq("company_id", userData.company_id)
+    .single();
+
+  if (recordError || !recordData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "Record not found or access denied",
+    );
+  }
+
+  // Verify client belongs to user's company if client is selected
+  if (clientId && clientId !== "none") {
+    const { data: clientData, error: clientError } = await supabase
+      .from("client_credentials")
+      .select("id")
+      .eq("id", clientId)
+      .eq("company_id", userData.company_id)
+      .single();
+
+    if (clientError || !clientData) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/onsite-support",
+        "Invalid client selection",
+      );
+    }
+  }
+
+  const { error } = await supabase
+    .from("onsite_support")
+    .update({
+      engineer_name: engineerName,
+      work_date: workDate,
+      check_in_time: checkInTime || null,
+      check_out_time: checkOutTime || null,
+      job_details: jobDetails || null,
+      client_credential_id: clientId && clientId !== "none" ? clientId : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", recordId);
+
+  if (error) {
+    console.error("Error updating onsite support record:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "Failed to update onsite support record",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/onsite-support?updated=true",
+    "Onsite support record updated successfully",
+  );
+};
+
+export const confirmStaffAccountAction = async (formData: FormData) => {
+  const staffId = formData.get("staff_id")?.toString();
+  const currentUserId = formData.get("current_user_id")?.toString();
+
+  const supabase = await createClient();
+
+  if (!currentUserId) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "You must be logged in",
+    );
+  }
+
+  if (!staffId) {
+    return encodedRedirect("error", "/dashboard/staff", "Staff ID is required");
+  }
+
+  const { data: userData, error: userError } = await supabase
+    .from("users")
+    .select("company_id, user_type")
+    .eq("id", currentUserId)
+    .single();
+
+  if (userError || !userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "You must have a company to confirm staff accounts",
+    );
+  }
+
+  if (userData.user_type !== "admin") {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Only administrators can confirm staff accounts",
+    );
+  }
+
+  const { data: staffData, error: staffError } = await supabase
+    .from("users")
+    .select("id, email")
+    .eq("id", staffId)
+    .eq("company_id", userData.company_id)
+    .single();
+
+  if (staffError || !staffData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Staff member not found or access denied",
+    );
+  }
+
+  try {
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({
+        email_confirmed: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", staffId);
+
+    if (updateError) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/staff",
+        "Failed to update staff account status",
+      );
+    }
+
+    return encodedRedirect(
+      "success",
+      "/dashboard/staff",
+      "Staff account confirmed successfully",
+    );
+  } catch (error) {
+    console.error("❌ Unexpected error confirming staff account:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Unexpected error confirming staff account",
+    );
+  }
+};
+
+export const exportOnsiteSupportAction = async (formData: FormData) => {
+  const filterType = formData.get("filter_type")?.toString() || "all";
+  const startDate = formData.get("start_date")?.toString();
+  const endDate = formData.get("end_date")?.toString();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "You must have a company to export onsite support records",
+    );
+  }
+
+  // Build query based on filter
+  let query = supabase
+    .from("onsite_support")
+    .select(
+      `
+      *,
+      client_credentials(
+        id,
+        username,
+        full_name,
+        email
+      )
+    `,
+    )
+    .eq("company_id", userData.company_id)
+    .order("work_date", { ascending: false });
+
+  // Apply filters only if filterType is not "all"
+  if (filterType === "date_range") {
+    if (!startDate || !endDate) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/onsite-support",
+        "Start date and end date are required for date range filter",
+      );
+    }
+    query = query.gte("work_date", startDate).lte("work_date", endDate);
+  } else if (filterType === "month") {
+    if (!startDate) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/onsite-support",
+        "Start date is required for month filter",
+      );
+    }
+    // Use start date to determine month
+    const monthStart = startDate.substring(0, 7) + "-01";
+    const monthEnd = new Date(
+      new Date(monthStart).getFullYear(),
+      new Date(monthStart).getMonth() + 1,
+      0,
+    )
+      .toISOString()
+      .split("T")[0];
+    query = query.gte("work_date", monthStart).lte("work_date", monthEnd);
+  }
+
+  const { data: records, error } = await query;
+
+  if (error) {
+    console.error("Error fetching records for export:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/onsite-support",
+      "Failed to fetch records for export",
+    );
+  }
+
+  const recordCount = records?.length || 0;
+  let filterText = "";
+
+  if (filterType === "date_range" && startDate && endDate) {
+    filterText = ` (${startDate} to ${endDate})`;
+  } else if (filterType === "month" && startDate) {
+    filterText = ` (${startDate.substring(0, 7)})`;
+  } else if (filterType === "all") {
+    filterText = " (All Records)";
+  }
+
+  // Store the records in URL params to display them
+  const recordsParam = encodeURIComponent(JSON.stringify(records || []));
+  const redirectUrl = `/dashboard/onsite-support?export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}`;
+
+  return redirect(redirectUrl);
+};
+
+export const exportClientOnsiteSupportAction = async (formData: FormData) => {
+  const filterType = formData.get("filter_type")?.toString() || "all";
+  const startDate = formData.get("start_date")?.toString();
+  const endDate = formData.get("end_date")?.toString();
+  const clientId = formData.get("client_id")?.toString();
+  const supabase = await createClient();
+
+  if (!clientId) {
+    return encodedRedirect("error", "/client-portal", "Client ID is required");
+  }
+
+  // Get client data to verify and get company_id
+  const { data: clientData, error: clientError } = await supabase
+    .from("client_credentials")
+    .select("company_id, username, full_name, email")
+    .eq("id", clientId)
+    .eq("is_active", true)
+    .single();
+
+  if (clientError || !clientData) {
+    return encodedRedirect(
+      "error",
+      "/client-portal",
+      "Invalid client credentials",
+    );
+  }
+
+  // Build query based on filter - only get records for this client
+  let query = supabase
+    .from("onsite_support")
+    .select(
+      `
+      *,
+      client_credentials(
+        id,
+        username,
+        full_name,
+        email
+      )
+    `,
+    )
+    .eq("company_id", clientData.company_id)
+    .eq("client_credential_id", clientId)
+    .order("work_date", { ascending: false });
+
+  // Apply filters only if filterType is not "all"
+  if (filterType === "date_range") {
+    if (!startDate || !endDate) {
+      return encodedRedirect(
+        "error",
+        `/client-portal/onsite-support?client_id=${clientId}`,
+        "Start date and end date are required for date range filter",
+      );
+    }
+    query = query.gte("work_date", startDate).lte("work_date", endDate);
+  } else if (filterType === "month") {
+    if (!startDate) {
+      return encodedRedirect(
+        "error",
+        `/client-portal/onsite-support?client_id=${clientId}`,
+        "Start date is required for month filter",
+      );
+    }
+    // Use start date to determine month
+    const monthStart = startDate.substring(0, 7) + "-01";
+    const monthEnd = new Date(
+      new Date(monthStart).getFullYear(),
+      new Date(monthStart).getMonth() + 1,
+      0,
+    )
+      .toISOString()
+      .split("T")[0];
+    query = query.gte("work_date", monthStart).lte("work_date", monthEnd);
+  }
+
+  const { data: records, error } = await query;
+
+  if (error) {
+    console.error("Error fetching records for export:", error);
+    return encodedRedirect(
+      "error",
+      `/client-portal/onsite-support?client_id=${clientId}`,
+      "Failed to fetch records for export",
+    );
+  }
+
+  const recordCount = records?.length || 0;
+  let filterText = "";
+
+  if (filterType === "date_range" && startDate && endDate) {
+    filterText = ` (${startDate} to ${endDate})`;
+  } else if (filterType === "month" && startDate) {
+    filterText = ` (${startDate.substring(0, 7)})`;
+  } else if (filterType === "all") {
+    filterText = " (All Records)";
+  }
+
+  // Store the records in URL params to display them
+  const recordsParam = encodeURIComponent(JSON.stringify(records || []));
+  const redirectUrl = `/client-portal/onsite-support?client_id=${clientId}&export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}`;
+
+  return redirect(redirectUrl);
 };
