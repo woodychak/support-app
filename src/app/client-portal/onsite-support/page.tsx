@@ -126,9 +126,36 @@ export default async function ClientOnsiteSupportPage({
           {/* Recent Records */}
           <Card>
             <CardHeader>
-              <CardTitle>Your Onsite Support Records</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>Your Onsite Support Records</span>
+                <div className="flex items-center gap-2 text-sm bg-blue-50 px-3 py-1 rounded-lg">
+                  <Clock className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-blue-900">
+                    {recordsWithHours
+                      ?.reduce((total, record) => {
+                        const recordDate = new Date(record.work_date);
+                        const currentDate = new Date();
+                        if (
+                          recordDate.getMonth() === currentDate.getMonth() &&
+                          recordDate.getFullYear() === currentDate.getFullYear()
+                        ) {
+                          const hours = parseFloat(record.totalHours || "0");
+                          return total + (isNaN(hours) ? 0 : hours);
+                        }
+                        return total;
+                      }, 0)
+                      .toFixed(1) || "0.0"}
+                    h this month
+                  </span>
+                </div>
+              </CardTitle>
               <CardDescription>
-                {recordsWithHours?.length || 0} onsite support records on file
+                {recordsWithHours?.length || 0} onsite support records on file •{" "}
+                {new Date().toLocaleDateString("en-US", {
+                  month: "long",
+                  year: "numeric",
+                })}{" "}
+                total hours
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -144,59 +171,95 @@ export default async function ClientOnsiteSupportPage({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {recordsWithHours.map((record) => (
-                    <div
-                      key={record.id}
-                      className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-4 mb-2">
-                            <h3 className="font-medium text-lg">
-                              {record.engineer_name}
-                            </h3>
-                            <div className="flex items-center gap-1 text-sm text-gray-500">
-                              <Calendar className="h-3 w-3" />
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left p-3 font-medium text-gray-900">
+                          Date
+                        </th>
+                        <th className="text-left p-3 font-medium text-gray-900">
+                          Engineer
+                        </th>
+                        <th className="text-left p-3 font-medium text-gray-900">
+                          Check In
+                        </th>
+                        <th className="text-left p-3 font-medium text-gray-900">
+                          Check Out
+                        </th>
+                        <th className="text-left p-3 font-medium text-gray-900">
+                          Total Hours
+                        </th>
+                        <th className="text-left p-3 font-medium text-gray-900">
+                          Job Details
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recordsWithHours.map((record) => (
+                        <tr
+                          key={record.id}
+                          className="border-b hover:bg-gray-50 transition-colors"
+                        >
+                          <td className="p-3">
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3 w-3 text-gray-500" />
                               {new Date(record.work_date).toLocaleDateString(
                                 "en-US",
                               )}
                             </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                            {record.check_in_time && (
+                          </td>
+                          <td className="p-3">
+                            <div className="font-medium text-gray-900">
+                              {record.engineer_name}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            {record.check_in_time ? (
                               <div className="flex items-center gap-1 text-sm">
                                 <Clock className="h-3 w-3 text-green-600" />
-                                <span>In: {record.check_in_time}</span>
+                                <span>{record.check_in_time}</span>
                               </div>
+                            ) : (
+                              <span className="text-gray-500 text-sm">-</span>
                             )}
-                            {record.check_out_time && (
+                          </td>
+                          <td className="p-3">
+                            {record.check_out_time ? (
                               <div className="flex items-center gap-1 text-sm">
                                 <Clock className="h-3 w-3 text-red-600" />
-                                <span>Out: {record.check_out_time}</span>
+                                <span>{record.check_out_time}</span>
                               </div>
+                            ) : (
+                              <span className="text-gray-500 text-sm">-</span>
                             )}
-                            {record.totalHours && (
+                          </td>
+                          <td className="p-3">
+                            {record.totalHours ? (
                               <div className="flex items-center gap-1 text-sm font-medium">
                                 <Clock className="h-3 w-3 text-blue-600" />
-                                <span>Total: {record.totalHours}h</span>
+                                <span>{record.totalHours}h</span>
                               </div>
+                            ) : (
+                              <span className="text-gray-500 text-sm">-</span>
                             )}
-                          </div>
-
-                          {record.job_details && (
-                            <div className="flex items-start gap-1 text-sm">
-                              <FileText className="h-3 w-3 mt-0.5 text-gray-500" />
-                              <p className="text-gray-600">
+                          </td>
+                          <td className="p-3 max-w-xs">
+                            {record.job_details ? (
+                              <div
+                                className="text-sm text-gray-600 truncate"
+                                title={record.job_details}
+                              >
                                 {record.job_details}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                              </div>
+                            ) : (
+                              <span className="text-gray-500 text-sm">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>

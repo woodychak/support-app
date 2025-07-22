@@ -36,6 +36,7 @@ import {
   FileText,
   Wrench,
   Edit,
+  Timer,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -61,6 +62,7 @@ import {
   OnsiteSupportExport,
   ExportResults,
 } from "@/components/onsite-support-export";
+import { StatsCard } from "@/components/ui/stats-card";
 
 interface OnsiteSupportPageProps {
   searchParams: Promise<
@@ -136,6 +138,40 @@ export default async function OnsiteSupportPage({
 
   // Get current date for default value
   const today = new Date().toISOString().split("T")[0];
+
+  // Calculate total hours for current month
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  const currentMonthHours =
+    recordsWithHours?.reduce((total, record) => {
+      const recordDate = new Date(record.work_date);
+      if (
+        recordDate.getMonth() === currentMonth &&
+        recordDate.getFullYear() === currentYear
+      ) {
+        const hours = parseFloat(record.totalHours || "0");
+        return total + (isNaN(hours) ? 0 : hours);
+      }
+      return total;
+    }, 0) || 0;
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const currentMonthName = monthNames[currentMonth];
 
   // Parse export results if available
   const exportResults = message.export_results
@@ -276,9 +312,18 @@ export default async function OnsiteSupportPage({
           {/* Existing Records */}
           <Card>
             <CardHeader>
-              <CardTitle>Onsite Support Records</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>Onsite Support Records</span>
+                <div className="flex items-center gap-2 text-sm bg-blue-50 px-3 py-1 rounded-lg">
+                  <Timer className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-blue-900">
+                    {currentMonthHours.toFixed(1)}h this month
+                  </span>
+                </div>
+              </CardTitle>
               <CardDescription>
-                {recordsWithHours?.length || 0} support records on file
+                {recordsWithHours?.length || 0} support records on file •{" "}
+                {currentMonthName} {currentYear} total hours
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -291,244 +336,301 @@ export default async function OnsiteSupportPage({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {recordsWithHours.map((record) => (
-                    <div
-                      key={record.id}
-                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-4 mb-2">
-                            <h3 className="font-medium text-lg">
-                              {record.engineer_name}
-                            </h3>
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                              <Calendar className="h-3 w-3" />
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left p-3 font-medium">Date</th>
+                        <th className="text-left p-3 font-medium">Engineer</th>
+                        <th className="text-left p-3 font-medium">Client</th>
+                        <th className="text-left p-3 font-medium">Check In</th>
+                        <th className="text-left p-3 font-medium">Check Out</th>
+                        <th className="text-left p-3 font-medium">
+                          Total Hours
+                        </th>
+                        <th className="text-left p-3 font-medium">
+                          Job Details
+                        </th>
+                        <th className="text-left p-3 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recordsWithHours.map((record) => (
+                        <tr
+                          key={record.id}
+                          className="border-b hover:bg-muted/30 transition-colors"
+                        >
+                          <td className="p-3">
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
                               {new Date(record.work_date).toLocaleDateString()}
                             </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                            {record.check_in_time && (
+                          </td>
+                          <td className="p-3">
+                            <div className="font-medium">
+                              {record.engineer_name}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <div className="text-sm">
+                              {record.client_credentials ? (
+                                <span>
+                                  {record.client_credentials.full_name ||
+                                    record.client_credentials.username}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            {record.check_in_time ? (
                               <div className="flex items-center gap-1 text-sm">
                                 <Clock className="h-3 w-3 text-green-600" />
-                                <span>In: {record.check_in_time}</span>
+                                <span>{record.check_in_time}</span>
                               </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">
+                                -
+                              </span>
                             )}
-                            {record.check_out_time && (
+                          </td>
+                          <td className="p-3">
+                            {record.check_out_time ? (
                               <div className="flex items-center gap-1 text-sm">
                                 <Clock className="h-3 w-3 text-red-600" />
-                                <span>Out: {record.check_out_time}</span>
+                                <span>{record.check_out_time}</span>
                               </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">
+                                -
+                              </span>
                             )}
-                            {record.totalHours && (
+                          </td>
+                          <td className="p-3">
+                            {record.totalHours ? (
                               <div className="flex items-center gap-1 text-sm font-medium">
                                 <Clock className="h-3 w-3 text-blue-600" />
-                                <span>Total: {record.totalHours}h</span>
+                                <span>{record.totalHours}h</span>
                               </div>
-                            )}
-                          </div>
-
-                          {record.client_credentials && (
-                            <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-                              <User className="h-3 w-3" />
-                              <span>
-                                Client:{" "}
-                                {record.client_credentials.full_name ||
-                                  record.client_credentials.username}
+                            ) : (
+                              <span className="text-muted-foreground text-sm">
+                                -
                               </span>
-                            </div>
-                          )}
-
-                          {record.job_details && (
-                            <div className="flex items-start gap-1 text-sm">
-                              <FileText className="h-3 w-3 mt-0.5 text-muted-foreground" />
-                              <p className="text-muted-foreground">
+                            )}
+                          </td>
+                          <td className="p-3 max-w-xs">
+                            {record.job_details ? (
+                              <div
+                                className="text-sm text-muted-foreground truncate"
+                                title={record.job_details}
+                              >
                                 {record.job_details}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex gap-2">
-                          {/* Edit Dialog */}
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <Edit className="h-3 w-3 mr-1" />
-                                Edit
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle>Edit Support Record</DialogTitle>
-                                <DialogDescription>
-                                  Update the onsite support record details.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <form className="space-y-4">
-                                <input
-                                  type="hidden"
-                                  name="record_id"
-                                  value={record.id}
-                                />
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label
-                                      htmlFor={`engineer_name_${record.id}`}
-                                    >
-                                      Engineer Name *
-                                    </Label>
-                                    <Input
-                                      id={`engineer_name_${record.id}`}
-                                      name="engineer_name"
-                                      type="text"
-                                      defaultValue={record.engineer_name}
-                                      required
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">
+                                -
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <div className="flex gap-2">
+                              {/* Edit Dialog */}
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <Edit className="h-3 w-3 mr-1" />
+                                    Edit
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-2xl">
+                                  <DialogHeader>
+                                    <DialogTitle>
+                                      Edit Support Record
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                      Update the onsite support record details.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <form className="space-y-4">
+                                    <input
+                                      type="hidden"
+                                      name="record_id"
+                                      value={record.id}
                                     />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`work_date_${record.id}`}>
-                                      Work Date *
-                                    </Label>
-                                    <Input
-                                      id={`work_date_${record.id}`}
-                                      name="work_date"
-                                      type="date"
-                                      defaultValue={record.work_date}
-                                      required
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label
-                                      htmlFor={`check_in_time_${record.id}`}
-                                    >
-                                      Check-in Time
-                                    </Label>
-                                    <Input
-                                      id={`check_in_time_${record.id}`}
-                                      name="check_in_time"
-                                      type="time"
-                                      defaultValue={record.check_in_time || ""}
-                                    />
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label
-                                      htmlFor={`check_out_time_${record.id}`}
-                                    >
-                                      Check-out Time
-                                    </Label>
-                                    <Input
-                                      id={`check_out_time_${record.id}`}
-                                      name="check_out_time"
-                                      type="time"
-                                      defaultValue={record.check_out_time || ""}
-                                    />
-                                  </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                  <Label htmlFor={`client_id_${record.id}`}>
-                                    Client (Optional)
-                                  </Label>
-                                  <Select
-                                    name="client_id"
-                                    defaultValue={
-                                      record.client_credential_id || "none"
-                                    }
-                                  >
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select a client (optional)" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">
-                                        No specific client
-                                      </SelectItem>
-                                      {clients?.map((client) => (
-                                        <SelectItem
-                                          key={client.id}
-                                          value={client.id}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div className="space-y-2">
+                                        <Label
+                                          htmlFor={`engineer_name_${record.id}`}
                                         >
-                                          {client.full_name || client.username}
-                                          {client.email && (
-                                            <span className="text-xs text-gray-500 ml-2">
-                                              ({client.email})
-                                            </span>
-                                          )}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
+                                          Engineer Name *
+                                        </Label>
+                                        <Input
+                                          id={`engineer_name_${record.id}`}
+                                          name="engineer_name"
+                                          type="text"
+                                          defaultValue={record.engineer_name}
+                                          required
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label
+                                          htmlFor={`work_date_${record.id}`}
+                                        >
+                                          Work Date *
+                                        </Label>
+                                        <Input
+                                          id={`work_date_${record.id}`}
+                                          name="work_date"
+                                          type="date"
+                                          defaultValue={record.work_date}
+                                          required
+                                        />
+                                      </div>
+                                    </div>
 
-                                <div className="space-y-2">
-                                  <Label htmlFor={`job_details_${record.id}`}>
-                                    Job Details
-                                  </Label>
-                                  <Textarea
-                                    id={`job_details_${record.id}`}
-                                    name="job_details"
-                                    defaultValue={record.job_details || ""}
-                                    rows={4}
-                                  />
-                                </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div className="space-y-2">
+                                        <Label
+                                          htmlFor={`check_in_time_${record.id}`}
+                                        >
+                                          Check-in Time
+                                        </Label>
+                                        <Input
+                                          id={`check_in_time_${record.id}`}
+                                          name="check_in_time"
+                                          type="time"
+                                          defaultValue={
+                                            record.check_in_time || ""
+                                          }
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label
+                                          htmlFor={`check_out_time_${record.id}`}
+                                        >
+                                          Check-out Time
+                                        </Label>
+                                        <Input
+                                          id={`check_out_time_${record.id}`}
+                                          name="check_out_time"
+                                          type="time"
+                                          defaultValue={
+                                            record.check_out_time || ""
+                                          }
+                                        />
+                                      </div>
+                                    </div>
 
-                                <DialogFooter>
-                                  <SubmitButton
-                                    formAction={updateOnsiteSupportAction}
-                                    pendingText="Updating..."
-                                  >
-                                    Update Record
-                                  </SubmitButton>
-                                </DialogFooter>
-                              </form>
-                            </DialogContent>
-                          </Dialog>
+                                    <div className="space-y-2">
+                                      <Label htmlFor={`client_id_${record.id}`}>
+                                        Client (Optional)
+                                      </Label>
+                                      <Select
+                                        name="client_id"
+                                        defaultValue={
+                                          record.client_credential_id || "none"
+                                        }
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select a client (optional)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="none">
+                                            No specific client
+                                          </SelectItem>
+                                          {clients?.map((client) => (
+                                            <SelectItem
+                                              key={client.id}
+                                              value={client.id}
+                                            >
+                                              {client.full_name ||
+                                                client.username}
+                                              {client.email && (
+                                                <span className="text-xs text-gray-500 ml-2">
+                                                  ({client.email})
+                                                </span>
+                                              )}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
 
-                          {/* Delete Dialog */}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm">
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Delete
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Delete Support Record
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this onsite
-                                  support record for {record.engineer_name}?
-                                  This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <form action={deleteOnsiteSupportAction}>
-                                  <input
-                                    type="hidden"
-                                    name="record_id"
-                                    value={record.id}
-                                  />
-                                  <AlertDialogAction asChild>
-                                    <Button variant="destructive" type="submit">
-                                      Delete
-                                    </Button>
-                                  </AlertDialogAction>
-                                </form>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                                    <div className="space-y-2">
+                                      <Label
+                                        htmlFor={`job_details_${record.id}`}
+                                      >
+                                        Job Details
+                                      </Label>
+                                      <Textarea
+                                        id={`job_details_${record.id}`}
+                                        name="job_details"
+                                        defaultValue={record.job_details || ""}
+                                        rows={4}
+                                      />
+                                    </div>
+
+                                    <DialogFooter>
+                                      <SubmitButton
+                                        formAction={updateOnsiteSupportAction}
+                                        pendingText="Updating..."
+                                      >
+                                        Update Record
+                                      </SubmitButton>
+                                    </DialogFooter>
+                                  </form>
+                                </DialogContent>
+                              </Dialog>
+
+                              {/* Delete Dialog */}
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="destructive" size="sm">
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    Delete
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Delete Support Record
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this
+                                      onsite support record for{" "}
+                                      {record.engineer_name}? This action cannot
+                                      be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <form action={deleteOnsiteSupportAction}>
+                                      <input
+                                        type="hidden"
+                                        name="record_id"
+                                        value={record.id}
+                                      />
+                                      <AlertDialogAction asChild>
+                                        <Button
+                                          variant="destructive"
+                                          type="submit"
+                                        >
+                                          Delete
+                                        </Button>
+                                      </AlertDialogAction>
+                                    </form>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </CardContent>

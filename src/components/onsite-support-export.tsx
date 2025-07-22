@@ -178,14 +178,29 @@ export function ExportResults({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Export Results{filterText}</span>
+          <div className="flex items-center gap-4">
+            <span>Export Results{filterText}</span>
+            <div className="flex items-center gap-2 text-sm bg-blue-50 px-3 py-1 rounded-lg">
+              <Download className="h-4 w-4 text-blue-600" />
+              <span className="font-medium text-blue-900">
+                {exportResultsWithHours
+                  .reduce((total, record) => {
+                    const hours = parseFloat(record.totalHours || "0");
+                    return total + (isNaN(hours) ? 0 : hours);
+                  }, 0)
+                  .toFixed(1)}
+                h total
+              </span>
+            </div>
+          </div>
           <Button onClick={handleDownloadExcel} className="ml-4">
             <Download className="h-4 w-4 mr-2" />
             Download Excel
           </Button>
         </CardTitle>
         <CardDescription>
-          {recordCount} records found{filterText}
+          {recordCount} records found{filterText} • Total hours for selected
+          period
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -195,68 +210,59 @@ export function ExportResults({
             <p>No records found for the selected criteria.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {exportResultsWithHours.map((record: any) => (
-              <div
-                key={record.id}
-                className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-4 mb-2">
-                      <h3 className="font-medium text-lg">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left p-3 font-medium">Date</th>
+                  <th className="text-left p-3 font-medium">Engineer</th>
+                  <th className="text-left p-3 font-medium">Check In</th>
+                  <th className="text-left p-3 font-medium">Check Out</th>
+                  <th className="text-left p-3 font-medium">Total Hours</th>
+                  <th className="text-left p-3 font-medium">Client</th>
+                  <th className="text-left p-3 font-medium">Job Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {exportResultsWithHours.map((record: any) => {
+                  const clientName = record.client_credentials
+                    ? record.client_credentials.full_name ||
+                      record.client_credentials.username
+                    : "No specific client";
+
+                  return (
+                    <tr
+                      key={record.id}
+                      className="border-b hover:bg-muted/30 transition-colors"
+                    >
+                      <td className="p-3 text-sm">{record.work_date}</td>
+                      <td className="p-3 text-sm font-medium">
                         {record.engineer_name}
-                      </h3>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <span>📅</span>
-                        {new Date(record.work_date).toLocaleDateString()}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                      {record.check_in_time && (
-                        <div className="flex items-center gap-1 text-sm">
-                          <span className="text-green-600">⏰</span>
-                          <span>In: {record.check_in_time}</span>
-                        </div>
-                      )}
-                      {record.check_out_time && (
-                        <div className="flex items-center gap-1 text-sm">
-                          <span className="text-red-600">⏰</span>
-                          <span>Out: {record.check_out_time}</span>
-                        </div>
-                      )}
-                      {record.totalHours && (
-                        <div className="flex items-center gap-1 text-sm font-medium">
-                          <span className="text-blue-600">⏰</span>
-                          <span>Total: {record.totalHours}h</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {record.client_credentials && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-                        <span>👤</span>
-                        <span>
-                          Client:{" "}
-                          {record.client_credentials.full_name ||
-                            record.client_credentials.username}
-                        </span>
-                      </div>
-                    )}
-
-                    {record.job_details && (
-                      <div className="flex items-start gap-1 text-sm">
-                        <span className="text-muted-foreground">📄</span>
-                        <p className="text-muted-foreground">
-                          {record.job_details}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+                      </td>
+                      <td className="p-3 text-sm">
+                        {record.check_in_time || "-"}
+                      </td>
+                      <td className="p-3 text-sm">
+                        {record.check_out_time || "-"}
+                      </td>
+                      <td className="p-3 text-sm font-medium">
+                        {record.totalHours ? `${record.totalHours}h` : "-"}
+                      </td>
+                      <td className="p-3 text-sm">{clientName}</td>
+                      <td className="p-3 text-sm max-w-xs">
+                        {record.job_details ? (
+                          <div className="truncate" title={record.job_details}>
+                            {record.job_details}
+                          </div>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </CardContent>
