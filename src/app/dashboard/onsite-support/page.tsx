@@ -420,19 +420,33 @@ export default async function OnsiteSupportPage({
                             )}
                           </td>
                           <td className="p-3 max-w-xs">
-                            {record.job_details ? (
-                              <div
-                                className="text-sm text-muted-foreground truncate"
-                                title={record.job_details}
-                              >
-                                {record.job_details}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">
-                                -
-                              </span>
-                            )}
-                          </td>
+  {record.job_details ? (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button
+          className="text-sm text-muted-foreground underline hover:text-primary truncate w-full text-left"
+          title="Click to view full job details"
+        >
+          {record.job_details.slice(0, 30)}...
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Job Details</DialogTitle>
+          <DialogDescription>
+            Full job description for {record.engineer_name} on{" "}
+            {new Date(record.work_date).toLocaleDateString()}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="whitespace-pre-line text-sm text-gray-700">
+          {record.job_details}
+        </div>
+      </DialogContent>
+    </Dialog>
+  ) : (
+    <span className="text-muted-foreground text-sm">-</span>
+  )}
+</td>
                           <td className="p-3">
                             <div className="flex gap-2">
                               {/* Edit Dialog */}
