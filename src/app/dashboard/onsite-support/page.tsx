@@ -62,7 +62,7 @@ import {
   OnsiteSupportExport,
   ExportResults,
 } from "@/components/onsite-support-export";
-import { StatsCard } from "@/components/ui/stats-card";
+
 
 interface OnsiteSupportPageProps {
   searchParams: Promise<
