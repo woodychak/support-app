@@ -1,4 +1,3 @@
-
 import { redirect } from "next/navigation";
 import { createClient } from "../../../../supabase/server";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,7 @@ import {
   AlertCircle,
   Archive,
   FileText,
+  Monitor,
 } from "lucide-react";
 import { DeleteTicketButton } from "@/components/delete-ticket-button";
 import Link from "next/link";
@@ -138,6 +138,12 @@ export default async function ClientDashboard({
                 <Button variant="outline">
                   <FileText className="h-4 w-4 mr-2" />
                   Onsite Reports
+                </Button>
+              </Link>
+              <Link href={`/client-portal/equipment?client_id=${clientId}`}>
+                <Button variant="outline">
+                  <Monitor className="h-4 w-4 mr-2" />
+                  Equipment
                 </Button>
               </Link>
               {!showClosed && ticketStats.closed > 0 && (

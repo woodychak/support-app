@@ -1208,29 +1208,29 @@ export const createStaffAccountAction = async (formData: FormData) => {
 
   // 檢查 Auth 內是否已有此 email 使用者
   const { data: listUsersData, error: listUsersError } =
-  await supabaseAdmin.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
+    await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
 
-if (listUsersError) {
-  console.error("Failed to list users:", listUsersError);
-  return encodedRedirect(
-    "error",
-    "/dashboard/staff",
-    "Failed to check existing users."
-  );
-}
+  if (listUsersError) {
+    console.error("Failed to list users:", listUsersError);
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Failed to check existing users.",
+    );
+  }
 
-const userExists = listUsersData?.users.some((user) => user.email === email);
+  const userExists = listUsersData?.users.some((user) => user.email === email);
 
-if (userExists) {
-  return encodedRedirect(
-    "error",
-    "/dashboard/staff",
-    "User already exists with this email."
-  );
-}
+  if (userExists) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "User already exists with this email.",
+    );
+  }
 
   try {
     console.log("🔧 Creating auth user:", email);
@@ -1962,6 +1962,466 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
   // Store the records in URL params to display them
   const recordsParam = encodeURIComponent(JSON.stringify(records || []));
   const redirectUrl = `/client-portal/onsite-support?client_id=${clientId}&export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}`;
+
+  return redirect(redirectUrl);
+};
+
+// Equipment Actions
+export const createEquipmentAction = async (formData: FormData) => {
+  const deviceName = formData.get("device_name")?.toString()?.trim();
+  const deviceType = formData.get("device_type")?.toString()?.trim();
+  const deviceIpAddress = formData.get("device_ip_address")?.toString()?.trim();
+  const deviceUrl = formData.get("device_url")?.toString()?.trim();
+  const loginUsername = formData.get("login_username")?.toString()?.trim();
+  const loginPassword = formData.get("login_password")?.toString();
+  const clientCredentialId = formData
+    .get("client_credential_id")
+    ?.toString()
+    ?.trim();
+  const status = formData.get("status")?.toString()?.trim() || "active";
+  const location = formData.get("location")?.toString()?.trim();
+  const description = formData.get("description")?.toString()?.trim();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!deviceName) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment/new",
+      "Device name is required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "You must have a company to create equipment records",
+    );
+  }
+
+  // Verify client belongs to user's company if client is selected
+  if (clientCredentialId) {
+    const { data: clientData, error: clientError } = await supabase
+      .from("client_credentials")
+      .select("id")
+      .eq("id", clientCredentialId)
+      .eq("company_id", userData.company_id)
+      .single();
+
+    if (clientError || !clientData) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/equipment",
+        "Invalid client selection",
+      );
+    }
+  }
+
+  const { error } = await supabase.from("equipment_inventory").insert({
+    device_name: deviceName,
+    device_type: deviceType || null,
+    device_ip_address: deviceIpAddress || null,
+    device_url: deviceUrl || null,
+    login_username: loginUsername || null,
+    login_password: loginPassword || null,
+    client_credential_id:
+      clientCredentialId && clientCredentialId !== ""
+        ? clientCredentialId
+        : null,
+    status: status,
+    location: location || null,
+    description: description || null,
+    company_id: userData.company_id,
+  });
+
+  if (error) {
+    console.error("Error creating equipment:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Failed to create equipment record",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/equipment",
+    "Equipment created successfully",
+  );
+};
+
+export const updateEquipmentAction = async (formData: FormData) => {
+  const equipmentId = formData.get("equipment_id")?.toString()?.trim();
+  const deviceName = formData.get("device_name")?.toString()?.trim();
+  const deviceType = formData.get("device_type")?.toString()?.trim();
+  const deviceIpAddress = formData.get("device_ip_address")?.toString()?.trim();
+  const deviceUrl = formData.get("device_url")?.toString()?.trim();
+  const loginUsername = formData.get("login_username")?.toString()?.trim();
+  const loginPassword = formData.get("login_password")?.toString();
+  const clientCredentialId = formData
+    .get("client_credential_id")
+    ?.toString()
+    ?.trim();
+  const status = formData.get("status")?.toString()?.trim() || "active";
+  const location = formData.get("location")?.toString()?.trim();
+  const description = formData.get("description")?.toString()?.trim();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!equipmentId || !deviceName) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Equipment ID and device name are required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "You must have a company to update equipment records",
+    );
+  }
+
+  // Verify equipment belongs to user's company
+  const { data: equipmentData, error: equipmentError } = await supabase
+    .from("equipment_inventory")
+    .select("id")
+    .eq("id", equipmentId)
+    .eq("company_id", userData.company_id)
+    .single();
+
+  if (equipmentError || !equipmentData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Equipment not found or access denied",
+    );
+  }
+
+  // Verify client belongs to user's company if client is selected
+  if (clientCredentialId) {
+    const { data: clientData, error: clientError } = await supabase
+      .from("client_credentials")
+      .select("id")
+      .eq("id", clientCredentialId)
+      .eq("company_id", userData.company_id)
+      .single();
+
+    if (clientError || !clientData) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/equipment",
+        "Invalid client selection",
+      );
+    }
+  }
+
+  const { error } = await supabase
+    .from("equipment_inventory")
+    .update({
+      device_name: deviceName,
+      device_type: deviceType || null,
+      device_ip_address: deviceIpAddress || null,
+      device_url: deviceUrl || null,
+      login_username: loginUsername || null,
+      login_password: loginPassword || null,
+      client_credential_id:
+        clientCredentialId && clientCredentialId !== ""
+          ? clientCredentialId
+          : null,
+      status: status,
+      location: location || null,
+      description: description || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", equipmentId);
+
+  if (error) {
+    console.error("Error updating equipment:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Failed to update equipment record",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/equipment",
+    "Equipment updated successfully",
+  );
+};
+
+export const deleteEquipmentAction = async (formData: FormData) => {
+  const equipmentId = formData.get("equipment_id")?.toString();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!equipmentId) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Equipment ID is required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "You must have a company to delete equipment records",
+    );
+  }
+
+  // Verify equipment belongs to user's company
+  const { data: equipmentData, error: equipmentError } = await supabase
+    .from("equipment_inventory")
+    .select("id")
+    .eq("id", equipmentId)
+    .eq("company_id", userData.company_id)
+    .single();
+
+  if (equipmentError || !equipmentData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Equipment not found or access denied",
+    );
+  }
+
+  // Delete the equipment
+  const { error } = await supabase
+    .from("equipment_inventory")
+    .delete()
+    .eq("id", equipmentId);
+
+  if (error) {
+    console.error("Error deleting equipment:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Failed to delete equipment record",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/equipment",
+    "Equipment deleted successfully",
+  );
+};
+
+export const exportEquipmentAction = async (formData: FormData) => {
+  const filterType = formData.get("filter_type")?.toString() || "all";
+  const filterValue = formData.get("filter_value")?.toString();
+  const includeCredentials =
+    formData.get("include_credentials")?.toString() === "true";
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "You must have a company to export equipment records",
+    );
+  }
+
+  // Build query based on filter
+  let query = supabase
+    .from("equipment_inventory")
+    .select(
+      `
+      *,
+      client_credentials(
+        id,
+        username,
+        full_name,
+        email
+      )
+    `,
+    )
+    .eq("company_id", userData.company_id)
+    .order("created_at", { ascending: false });
+
+  // Apply filters
+  if (filterType === "status" && filterValue) {
+    query = query.eq("status", filterValue.toLowerCase());
+  } else if (filterType === "type" && filterValue) {
+    query = query.ilike("device_type", `%${filterValue}%`);
+  } else if (filterType === "client" && filterValue) {
+    // This is more complex - we need to filter by client name
+    const { data: clientData } = await supabase
+      .from("client_credentials")
+      .select("id")
+      .eq("company_id", userData.company_id)
+      .or(`username.ilike.%${filterValue}%,full_name.ilike.%${filterValue}%`);
+
+    if (clientData && clientData.length > 0) {
+      const clientIds = clientData.map((c) => c.id);
+      query = query.in("client_credential_id", clientIds);
+    } else {
+      // No matching clients found, return empty result
+      query = query.eq("id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
+    }
+  }
+
+  const { data: records, error } = await query;
+
+  if (error) {
+    console.error("Error fetching records for export:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Failed to fetch records for export",
+    );
+  }
+
+  const recordCount = records?.length || 0;
+  let filterText = "";
+
+  if (filterType === "status" && filterValue) {
+    filterText = ` (Status: ${filterValue})`;
+  } else if (filterType === "type" && filterValue) {
+    filterText = ` (Type: ${filterValue})`;
+  } else if (filterType === "client" && filterValue) {
+    filterText = ` (Client: ${filterValue})`;
+  } else if (filterType === "all") {
+    filterText = " (All Equipment)";
+  }
+
+  // Store the records in URL params to display them
+  const recordsParam = encodeURIComponent(JSON.stringify(records || []));
+  const redirectUrl = `/dashboard/equipment?export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}&include_credentials=${includeCredentials}`;
+
+  return redirect(redirectUrl);
+};
+
+export const exportClientEquipmentAction = async (formData: FormData) => {
+  const filterType = formData.get("filter_type")?.toString() || "all";
+  const filterValue = formData.get("filter_value")?.toString();
+  const clientId = formData.get("client_id")?.toString();
+  const supabase = await createClient();
+
+  if (!clientId) {
+    return encodedRedirect("error", "/client-portal", "Client ID is required");
+  }
+
+  // Get client data to verify and get company_id
+  const { data: clientData, error: clientError } = await supabase
+    .from("client_credentials")
+    .select("company_id, username, full_name, email")
+    .eq("id", clientId)
+    .eq("is_active", true)
+    .single();
+
+  if (clientError || !clientData) {
+    return encodedRedirect(
+      "error",
+      "/client-portal",
+      "Invalid client credentials",
+    );
+  }
+
+  // Build query based on filter - only get records for this client
+  let query = supabase
+    .from("equipment_inventory")
+    .select("*")
+    .eq("company_id", clientData.company_id)
+    .eq("client_credential_id", clientId)
+    .order("created_at", { ascending: false });
+
+  // Apply filters
+  if (filterType === "status" && filterValue) {
+    query = query.eq("status", filterValue.toLowerCase());
+  } else if (filterType === "type" && filterValue) {
+    query = query.ilike("device_type", `%${filterValue}%`);
+  }
+
+  const { data: records, error } = await query;
+
+  if (error) {
+    console.error("Error fetching records for export:", error);
+    return encodedRedirect(
+      "error",
+      `/client-portal/equipment?client_id=${clientId}`,
+      "Failed to fetch records for export",
+    );
+  }
+
+  const recordCount = records?.length || 0;
+  let filterText = "";
+
+  if (filterType === "status" && filterValue) {
+    filterText = ` (Status: ${filterValue})`;
+  } else if (filterType === "type" && filterValue) {
+    filterText = ` (Type: ${filterValue})`;
+  } else if (filterType === "all") {
+    filterText = " (All Equipment)";
+  }
+
+  // Store the records in URL params to display them
+  const recordsParam = encodeURIComponent(JSON.stringify(records || []));
+  const redirectUrl = `/client-portal/equipment?client_id=${clientId}&export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}`;
 
   return redirect(redirectUrl);
 };

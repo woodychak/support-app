@@ -204,6 +204,72 @@ export type Database = {
           },
         ]
       }
+      equipment_inventory: {
+        Row: {
+          client_credential_id: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          device_ip_address: string | null
+          device_name: string
+          device_type: string | null
+          device_url: string | null
+          id: string
+          location: string | null
+          login_password: string | null
+          login_username: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_credential_id?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          device_ip_address?: string | null
+          device_name: string
+          device_type?: string | null
+          device_url?: string | null
+          id?: string
+          location?: string | null
+          login_password?: string | null
+          login_username?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_credential_id?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          device_ip_address?: string | null
+          device_name?: string
+          device_type?: string | null
+          device_url?: string | null
+          id?: string
+          location?: string | null
+          login_password?: string | null
+          login_username?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_inventory_client_credential_id_fkey"
+            columns: ["client_credential_id"]
+            isOneToOne: false
+            referencedRelation: "client_credentials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_inventory_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onsite_support: {
         Row: {
           check_in_time: string | null
