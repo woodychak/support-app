@@ -23,6 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { decrypt } from "@/utils/encryption";
 
 export default async function EquipmentPage({
   searchParams,
@@ -81,6 +82,11 @@ export default async function EquipmentPage({
     maintenance:
       equipment?.filter((e) => e.status === "maintenance").length || 0,
   };
+
+  const decryptedEquipment = equipment?.map((e) => ({
+    ...e,
+    login_password: e.login_password ? decrypt(e.login_password) : null,
+  }));
 
   return (
     <>
@@ -171,7 +177,7 @@ export default async function EquipmentPage({
             </CardHeader>
             <CardContent>
               <EquipmentTable
-                equipment={equipment || []}
+                equipment={decryptedEquipment || []}
                 clients={clients || []}
               />
             </CardContent>

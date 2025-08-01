@@ -14,8 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      client_company_profiles: {
+        Row: {
+          address: string | null
+          company_name: string
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          logo_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          company_name: string
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_name?: string
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       client_credentials: {
         Row: {
+          client_company_profile_id: string | null
           company_id: string
           created_at: string
           email: string | null
@@ -23,10 +63,12 @@ export type Database = {
           id: string
           is_active: boolean | null
           password_hash: string
+          role: string | null
           updated_at: string | null
           username: string
         }
         Insert: {
+          client_company_profile_id?: string | null
           company_id: string
           created_at?: string
           email?: string | null
@@ -34,10 +76,12 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           password_hash: string
+          role?: string | null
           updated_at?: string | null
           username: string
         }
         Update: {
+          client_company_profile_id?: string | null
           company_id?: string
           created_at?: string
           email?: string | null
@@ -45,10 +89,18 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           password_hash?: string
+          role?: string | null
           updated_at?: string | null
           username?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_credentials_client_company_profile_id_fkey"
+            columns: ["client_company_profile_id"]
+            isOneToOne: false
+            referencedRelation: "client_company_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_credentials_company_id_fkey"
             columns: ["company_id"]

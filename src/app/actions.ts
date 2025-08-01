@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "../../supabase/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { encrypt, decrypt } from "@/utils/encryption";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
@@ -248,6 +249,10 @@ export const createClientCredentialAction = async (formData: FormData) => {
   const password = formData.get("password")?.toString();
   const email = formData.get("email")?.toString();
   const fullName = formData.get("full_name")?.toString();
+  const role = formData.get("role")?.toString() || "user";
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString();
   const supabase = await createClient();
 
   const {
@@ -290,6 +295,8 @@ export const createClientCredentialAction = async (formData: FormData) => {
     password_hash: passwordHash,
     email,
     full_name: fullName,
+    role,
+    client_company_profile_id: clientCompanyProfileId || null,
     is_active: true,
   });
 
@@ -315,6 +322,10 @@ export const updateClientCredentialAction = async (formData: FormData) => {
   const password = formData.get("password")?.toString();
   const email = formData.get("email")?.toString();
   const fullName = formData.get("full_name")?.toString();
+  const role = formData.get("role")?.toString() || "user";
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString();
   const isActive = formData.get("is_active") === "on";
   const supabase = await createClient();
 
@@ -370,6 +381,8 @@ export const updateClientCredentialAction = async (formData: FormData) => {
     username,
     email,
     full_name: fullName,
+    role,
+    client_company_profile_id: clientCompanyProfileId || null,
     is_active: isActive,
     updated_at: new Date().toISOString(),
   };
@@ -491,7 +504,7 @@ export const clientSignInAction = async (formData: FormData) => {
 
   const { data: clientData, error } = await supabase
     .from("client_credentials")
-    .select("*, companies(*)")
+    .select("*, companies(*), client_company_profiles(*)")
     .eq("username", username)
     .eq("password_hash", passwordHash)
     .eq("is_active", true)
@@ -501,8 +514,10 @@ export const clientSignInAction = async (formData: FormData) => {
     return encodedRedirect("error", "/client-portal", "Invalid credentials");
   }
 
-  // Store client session (simplified - in production use proper session management)
-  return redirect(`/client-portal/dashboard?client_id=${clientData.id}`);
+  // Store client session with role information (simplified - in production use proper session management)
+  return redirect(
+    `/client-portal/dashboard?client_id=${clientData.id}&role=${clientData.role}`,
+  );
 };
 
 export const updateUserProfileAction = async (formData: FormData) => {
@@ -1974,6 +1989,12 @@ export const createEquipmentAction = async (formData: FormData) => {
   const deviceUrl = formData.get("device_url")?.toString()?.trim();
   const loginUsername = formData.get("login_username")?.toString()?.trim();
   const loginPassword = formData.get("login_password")?.toString();
+  const encryptedPassword =
+    loginPassword && loginPassword !== "" ? encrypt(loginPassword) : null;
+
+  const decryptedPassword = encryptedPassword
+    ? decrypt(encryptedPassword)
+    : null;
   const clientCredentialId = formData
     .get("client_credential_id")
     ?.toString()
@@ -2038,7 +2059,7 @@ export const createEquipmentAction = async (formData: FormData) => {
     device_ip_address: deviceIpAddress || null,
     device_url: deviceUrl || null,
     login_username: loginUsername || null,
-    login_password: loginPassword || null,
+    login_password: encryptedPassword,
     client_credential_id:
       clientCredentialId && clientCredentialId !== ""
         ? clientCredentialId
@@ -2073,6 +2094,26 @@ export const updateEquipmentAction = async (formData: FormData) => {
   const deviceUrl = formData.get("device_url")?.toString()?.trim();
   const loginUsername = formData.get("login_username")?.toString()?.trim();
   const loginPassword = formData.get("login_password")?.toString();
+  let encryptedPassword;
+  let decryptedPassword;
+  try {
+    encryptedPassword =
+      loginPassword && loginPassword !== ""
+        ? encrypt(loginPassword)
+        : undefined;
+
+    decryptedPassword = encryptedPassword ? decrypt(encryptedPassword) : null;
+
+    console.log("🔒 Encrypted Password:", encryptedPassword);
+    console.log("🔓 Decrypted Password:", decryptedPassword);
+  } catch (e) {
+    console.error("Encryption/Decryption error:", e);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Encryption failed",
+    );
+  }
   const clientCredentialId = formData
     .get("client_credential_id")
     ?.toString()
@@ -2155,7 +2196,7 @@ export const updateEquipmentAction = async (formData: FormData) => {
       device_ip_address: deviceIpAddress || null,
       device_url: deviceUrl || null,
       login_username: loginUsername || null,
-      login_password: loginPassword || null,
+      login_password: encryptedPassword,
       client_credential_id:
         clientCredentialId && clientCredentialId !== ""
           ? clientCredentialId

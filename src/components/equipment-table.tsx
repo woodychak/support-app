@@ -55,6 +55,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { decrypt } from "@/utils/encryption";
 
 interface EquipmentTableProps {
   equipment: any[];
@@ -65,9 +66,9 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<any>(null);
-  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(
-    new Set(),
-  );
+  const [visiblePasswords, setVisiblePasswords] = useState<{
+    [id: string]: boolean;
+  }>({});
   const [includeCredentials, setIncludeCredentials] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClient, setSelectedClient] = useState<string>("all");
@@ -85,13 +86,10 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
   };
 
   const togglePasswordVisibility = (equipmentId: string) => {
-    const newVisible = new Set(visiblePasswords);
-    if (newVisible.has(equipmentId)) {
-      newVisible.delete(equipmentId);
-    } else {
-      newVisible.add(equipmentId);
-    }
-    setVisiblePasswords(newVisible);
+    setVisiblePasswords((prev) => ({
+      ...prev,
+      [equipmentId]: !prev[equipmentId],
+    }));
   };
 
   const copyToClipboard = async (text: string, type: string) => {
@@ -253,7 +251,9 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
               </TableRow>
             ) : (
               filteredEquipment.map((item) => {
-                const isPasswordVisible = visiblePasswords.has(item.id);
+                const isPasswordVisible = (equipmentId: string) => {
+                  return visiblePasswords[equipmentId] ?? false;
+                };
                 return (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">
@@ -322,7 +322,7 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
                                 Pass:
                               </span>
                               <span className="text-sm font-mono">
-                                {isPasswordVisible
+                                {isPasswordVisible(item.id)
                                   ? item.login_password
                                   : "••••••••"}
                               </span>
@@ -334,7 +334,7 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
                                 }
                                 className="h-6 w-6 p-0"
                               >
-                                {isPasswordVisible ? (
+                                {isPasswordVisible(item.id) ? (
                                   <EyeOff className="h-3 w-3" />
                                 ) : (
                                   <Eye className="h-3 w-3" />
@@ -345,7 +345,9 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
                                 size="sm"
                                 onClick={() =>
                                   copyToClipboard(
-                                    item.login_password,
+                                    isPasswordVisible(item.id)
+                                      ? decryptPassword(item.login_password)
+                                      : item.login_password,
                                     "Password",
                                   )
                                 }

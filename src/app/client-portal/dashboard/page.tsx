@@ -24,7 +24,11 @@ import { DeleteTicketButton } from "@/components/delete-ticket-button";
 import Link from "next/link";
 
 interface ClientDashboardProps {
-  searchParams: Promise<{ client_id?: string; show_closed?: string }>;
+  searchParams: Promise<{
+    client_id?: string;
+    show_closed?: string;
+    role?: string;
+  }>;
 }
 
 export default async function ClientDashboard({
@@ -33,6 +37,7 @@ export default async function ClientDashboard({
   const params = await searchParams;
   const clientId = params.client_id;
   const showClosed = params.show_closed === "true";
+  const userRole = params.role || "user";
 
   if (!clientId) {
     return redirect("/client-portal");
@@ -43,7 +48,7 @@ export default async function ClientDashboard({
   // Get client data
   const { data: clientData, error } = await supabase
     .from("client_credentials")
-    .select("*, companies(*)")
+    .select("*, companies(*), client_company_profiles(*)")
     .eq("id", clientId)
     .eq("is_active", true)
     .single();
@@ -140,12 +145,16 @@ export default async function ClientDashboard({
                   Onsite Reports
                 </Button>
               </Link>
-              <Link href={`/client-portal/equipment?client_id=${clientId}`}>
-                <Button variant="outline">
-                  <Monitor className="h-4 w-4 mr-2" />
-                  Equipment
-                </Button>
-              </Link>
+              {userRole === "admin" && (
+                <Link
+                  href={`/client-portal/equipment?client_id=${clientId}&role=${userRole}`}
+                >
+                  <Button variant="outline">
+                    <Monitor className="h-4 w-4 mr-2" />
+                    Equipment
+                  </Button>
+                </Link>
+              )}
               {!showClosed && ticketStats.closed > 0 && (
                 <Link
                   href={`/client-portal/dashboard?client_id=${clientId}&show_closed=true`}
@@ -252,7 +261,7 @@ export default async function ClientDashboard({
                     Create your first support ticket to get help from our team.
                   </p>
                   <Link
-                    href={`/client-portal/tickets/new?client_id=${clientId}`}
+                    href={`/client-portal/tickets/new?client_id=${clientId}&role=${userRole}`}
                   >
                     <Button>
                       <Plus className="h-4 w-4 mr-2" />
@@ -293,7 +302,7 @@ export default async function ClientDashboard({
                         </span>
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/client-portal/tickets/${ticket.id}?client_id=${clientId}`}
+                            href={`/client-portal/tickets/${ticket.id}?client_id=${clientId}&role=${userRole}`}
                             className="text-blue-600 hover:underline flex items-center gap-1"
                           >
                             <MessageSquare className="h-3 w-3" />

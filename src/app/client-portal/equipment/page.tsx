@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/toaster";
 interface ClientEquipmentProps {
   searchParams: Promise<{
     client_id?: string;
+    role?: string;
     export_results?: string;
     filter_text?: string;
     record_count?: string;
@@ -29,9 +30,17 @@ export default async function ClientEquipmentPage({
 }: ClientEquipmentProps) {
   const params = await searchParams;
   const clientId = params.client_id;
+  const userRole = params.role || "user";
 
   if (!clientId) {
     return redirect("/client-portal");
+  }
+
+  // Check if user has admin role to access equipment page
+  if (userRole !== "admin") {
+    return redirect(
+      `/client-portal/dashboard?client_id=${clientId}&role=${userRole}`,
+    );
   }
 
   const supabase = await createClient();
@@ -39,7 +48,7 @@ export default async function ClientEquipmentPage({
   // Get client data
   const { data: clientData, error } = await supabase
     .from("client_credentials")
-    .select("*, companies(*)")
+    .select("*, companies(*), client_company_profiles(*)")
     .eq("id", clientId)
     .eq("is_active", true)
     .single();
@@ -86,7 +95,9 @@ export default async function ClientEquipmentPage({
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href={`/client-portal/dashboard?client_id=${clientId}`}>
+              <Link
+                href={`/client-portal/dashboard?client_id=${clientId}&role=${userRole}`}
+              >
                 <Button variant="outline" size="sm">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Dashboard
