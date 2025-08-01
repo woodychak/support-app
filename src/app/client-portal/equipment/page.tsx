@@ -24,6 +24,7 @@ interface ClientEquipmentProps {
   }>;
 }
 
+
 export default async function ClientEquipmentPage({
   searchParams,
 }: ClientEquipmentProps) {
@@ -197,7 +198,7 @@ export default async function ClientEquipmentPage({
                 </div>
               ) : (
                 <ClientEquipmentTable
-                  equipment={decryptedEquipment}
+                  equipment={decryptedEquipment || []}
                   showDownloadButton={true}
                 />
               )}

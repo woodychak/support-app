@@ -25,6 +25,11 @@ import {
 } from "@/components/ui/dialog";
 import { decrypt } from "@/utils/encryption";
 
+
+interface EquipmentPageProps {
+  searchParams: Record<string, string | string[] | undefined>;
+}
+
 export default async function EquipmentPage({
   searchParams,
 }: EquipmentPageProps) {
