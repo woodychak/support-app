@@ -36,13 +36,11 @@ export default async function NewEquipmentPage() {
     return redirect("/dashboard");
   }
 
-  // Get clients for the form
-  const { data: clients } = await supabase
-    .from("client_credentials")
-    .select("id, username, full_name, email")
-    .eq("company_id", userData.company_id)
-    .eq("is_active", true)
-    .order("full_name");
+  // Get client company profiles for the form
+  const { data: clientCompanyProfiles } = await supabase
+    .from("client_company_profiles")
+    .select("id, company_name, contact_person, contact_email")
+    .order("company_name");
 
   return (
     <>
@@ -80,7 +78,9 @@ export default async function NewEquipmentPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <EquipmentForm clients={clients || []} />
+              <EquipmentForm
+                clientCompanyProfiles={clientCompanyProfiles || []}
+              />
             </CardContent>
           </Card>
         </div>

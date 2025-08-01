@@ -258,7 +258,7 @@ export type Database = {
       }
       equipment_inventory: {
         Row: {
-          client_credential_id: string | null
+          client_company_profile_id: string | null
           company_id: string
           created_at: string
           description: string | null
@@ -274,7 +274,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          client_credential_id?: string | null
+          client_company_profile_id?: string | null
           company_id: string
           created_at?: string
           description?: string | null
@@ -290,7 +290,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          client_credential_id?: string | null
+          client_company_profile_id?: string | null
           company_id?: string
           created_at?: string
           description?: string | null
@@ -307,10 +307,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "equipment_inventory_client_credential_id_fkey"
-            columns: ["client_credential_id"]
+            foreignKeyName: "equipment_inventory_client_company_profile_id_fkey"
+            columns: ["client_company_profile_id"]
             isOneToOne: false
-            referencedRelation: "client_credentials"
+            referencedRelation: "client_company_profiles"
             referencedColumns: ["id"]
           },
           {

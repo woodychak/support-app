@@ -1995,8 +1995,8 @@ export const createEquipmentAction = async (formData: FormData) => {
   const decryptedPassword = encryptedPassword
     ? decrypt(encryptedPassword)
     : null;
-  const clientCredentialId = formData
-    .get("client_credential_id")
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
     ?.toString()
     ?.trim();
   const status = formData.get("status")?.toString()?.trim() || "active";
@@ -2035,20 +2035,19 @@ export const createEquipmentAction = async (formData: FormData) => {
     );
   }
 
-  // Verify client belongs to user's company if client is selected
-  if (clientCredentialId) {
-    const { data: clientData, error: clientError } = await supabase
-      .from("client_credentials")
+  // Verify client company profile exists if selected
+  if (clientCompanyProfileId && clientCompanyProfileId !== "unassigned") {
+    const { data: profileData, error: profileError } = await supabase
+      .from("client_company_profiles")
       .select("id")
-      .eq("id", clientCredentialId)
-      .eq("company_id", userData.company_id)
+      .eq("id", clientCompanyProfileId)
       .single();
 
-    if (clientError || !clientData) {
+    if (profileError || !profileData) {
       return encodedRedirect(
         "error",
         "/dashboard/equipment",
-        "Invalid client selection",
+        "Invalid client company selection",
       );
     }
   }
@@ -2060,9 +2059,9 @@ export const createEquipmentAction = async (formData: FormData) => {
     device_url: deviceUrl || null,
     login_username: loginUsername || null,
     login_password: encryptedPassword,
-    client_credential_id:
-      clientCredentialId && clientCredentialId !== ""
-        ? clientCredentialId
+    client_company_profile_id:
+      clientCompanyProfileId && clientCompanyProfileId !== "unassigned"
+        ? clientCompanyProfileId
         : null,
     status: status,
     location: location || null,
@@ -2114,8 +2113,8 @@ export const updateEquipmentAction = async (formData: FormData) => {
       "Encryption failed",
     );
   }
-  const clientCredentialId = formData
-    .get("client_credential_id")
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
     ?.toString()
     ?.trim();
   const status = formData.get("status")?.toString()?.trim() || "active";
@@ -2170,20 +2169,19 @@ export const updateEquipmentAction = async (formData: FormData) => {
     );
   }
 
-  // Verify client belongs to user's company if client is selected
-  if (clientCredentialId) {
-    const { data: clientData, error: clientError } = await supabase
-      .from("client_credentials")
+  // Verify client company profile exists if selected
+  if (clientCompanyProfileId && clientCompanyProfileId !== "unassigned") {
+    const { data: profileData, error: profileError } = await supabase
+      .from("client_company_profiles")
       .select("id")
-      .eq("id", clientCredentialId)
-      .eq("company_id", userData.company_id)
+      .eq("id", clientCompanyProfileId)
       .single();
 
-    if (clientError || !clientData) {
+    if (profileError || !profileData) {
       return encodedRedirect(
         "error",
         "/dashboard/equipment",
-        "Invalid client selection",
+        "Invalid client company selection",
       );
     }
   }
@@ -2197,9 +2195,9 @@ export const updateEquipmentAction = async (formData: FormData) => {
       device_url: deviceUrl || null,
       login_username: loginUsername || null,
       login_password: encryptedPassword,
-      client_credential_id:
-        clientCredentialId && clientCredentialId !== ""
-          ? clientCredentialId
+      client_company_profile_id:
+        clientCompanyProfileId && clientCompanyProfileId !== "unassigned"
+          ? clientCompanyProfileId
           : null,
       status: status,
       location: location || null,
@@ -2333,11 +2331,9 @@ export const exportEquipmentAction = async (formData: FormData) => {
     .select(
       `
       *,
-      client_credentials(
+      client_company_profiles(
         id,
-        username,
-        full_name,
-        email
+        company_name
       )
     `,
     )
@@ -2350,18 +2346,17 @@ export const exportEquipmentAction = async (formData: FormData) => {
   } else if (filterType === "type" && filterValue) {
     query = query.ilike("device_type", `%${filterValue}%`);
   } else if (filterType === "client" && filterValue) {
-    // This is more complex - we need to filter by client name
-    const { data: clientData } = await supabase
-      .from("client_credentials")
+    // This is more complex - we need to filter by client company name
+    const { data: clientCompanyData } = await supabase
+      .from("client_company_profiles")
       .select("id")
-      .eq("company_id", userData.company_id)
-      .or(`username.ilike.%${filterValue}%,full_name.ilike.%${filterValue}%`);
+      .ilike("company_name", `%${filterValue}%`);
 
-    if (clientData && clientData.length > 0) {
-      const clientIds = clientData.map((c) => c.id);
-      query = query.in("client_credential_id", clientIds);
+    if (clientCompanyData && clientCompanyData.length > 0) {
+      const clientCompanyIds = clientCompanyData.map((c) => c.id);
+      query = query.in("client_company_profile_id", clientCompanyIds);
     } else {
-      // No matching clients found, return empty result
+      // No matching client companies found, return empty result
       query = query.eq("id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
     }
   }
@@ -2377,7 +2372,16 @@ export const exportEquipmentAction = async (formData: FormData) => {
     );
   }
 
-  const recordCount = records?.length || 0;
+  // Decrypt passwords for export if credentials are included
+  const processedRecords = records?.map((record) => ({
+    ...record,
+    login_password:
+      record.login_password && includeCredentials
+        ? decrypt(record.login_password)
+        : record.login_password,
+  }));
+
+  const recordCount = processedRecords?.length || 0;
   let filterText = "";
 
   if (filterType === "status" && filterValue) {
@@ -2391,7 +2395,9 @@ export const exportEquipmentAction = async (formData: FormData) => {
   }
 
   // Store the records in URL params to display them
-  const recordsParam = encodeURIComponent(JSON.stringify(records || []));
+  const recordsParam = encodeURIComponent(
+    JSON.stringify(processedRecords || []),
+  );
   const redirectUrl = `/dashboard/equipment?export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}&include_credentials=${includeCredentials}`;
 
   return redirect(redirectUrl);
@@ -2423,12 +2429,27 @@ export const exportClientEquipmentAction = async (formData: FormData) => {
     );
   }
 
-  // Build query based on filter - only get records for this client
+  // Get client's company profile ID
+  const { data: clientCredential } = await supabase
+    .from("client_credentials")
+    .select("client_company_profile_id")
+    .eq("id", clientId)
+    .single();
+
+  if (!clientCredential?.client_company_profile_id) {
+    return encodedRedirect(
+      "error",
+      `/client-portal/equipment?client_id=${clientId}`,
+      "No company profile associated with this client",
+    );
+  }
+
+  // Build query based on filter - only get records for this client's company
   let query = supabase
     .from("equipment_inventory")
     .select("*")
     .eq("company_id", clientData.company_id)
-    .eq("client_credential_id", clientId)
+    .eq("client_company_profile_id", clientCredential.client_company_profile_id)
     .order("created_at", { ascending: false });
 
   // Apply filters

@@ -56,24 +56,22 @@ export default async function EquipmentPage({
     .select(
       `
       *,
-      client_credentials(
+      client_company_profiles(
         id,
-        username,
-        full_name,
-        email
+        company_name,
+        contact_person,
+        contact_email
       )
     `,
     )
     .eq("company_id", userData.company_id)
     .order("created_at", { ascending: false });
 
-  // Get clients for the form
-  const { data: clients } = await supabase
-    .from("client_credentials")
-    .select("id, username, full_name, email")
-    .eq("company_id", userData.company_id)
-    .eq("is_active", true)
-    .order("full_name");
+  // Get client company profiles for the form
+  const { data: clientCompanyProfiles } = await supabase
+    .from("client_company_profiles")
+    .select("id, company_name, contact_person, contact_email")
+    .order("company_name");
 
   const equipmentStats = {
     total: equipment?.length || 0,
@@ -178,7 +176,7 @@ export default async function EquipmentPage({
             <CardContent>
               <EquipmentTable
                 equipment={decryptedEquipment || []}
-                clients={clients || []}
+                clientCompanyProfiles={clientCompanyProfiles || []}
               />
             </CardContent>
           </Card>

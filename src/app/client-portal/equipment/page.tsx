@@ -11,9 +11,8 @@ import {
 import { Monitor, Download, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { ClientEquipmentTable } from "@/components/client-equipment-table";
-import { ClientEquipmentExport } from "@/components/client-equipment-export";
-import { ClientEquipmentExportResults } from "@/components/client-equipment-export-results";
 import { Toaster } from "@/components/ui/toaster";
+import { decrypt } from "@/utils/encryption";
 
 interface ClientEquipmentProps {
   searchParams: Promise<{
@@ -57,11 +56,13 @@ export default async function ClientEquipmentPage({
     return redirect("/client-portal");
   }
 
-  // Get client's equipment
+  // Get client's equipment based on their company profile
+  const clientCompanyProfileId = clientData.client_company_profile_id;
+
   const { data: equipment } = await supabase
     .from("equipment_inventory")
     .select("*")
-    .eq("client_credential_id", clientId)
+    .eq("client_company_profile_id", clientCompanyProfileId)
     .order("created_at", { ascending: false });
 
   const equipmentStats = {
@@ -72,20 +73,10 @@ export default async function ClientEquipmentPage({
       equipment?.filter((e) => e.status === "maintenance").length || 0,
   };
 
-  // Handle export results
-  let exportResults = null;
-  let filterText = "";
-  let recordCount = 0;
-
-  if (params.export_results) {
-    try {
-      exportResults = JSON.parse(decodeURIComponent(params.export_results));
-      filterText = decodeURIComponent(params.filter_text || "");
-      recordCount = parseInt(params.record_count || "0");
-    } catch (e) {
-      console.error("Error parsing export results:", e);
-    }
-  }
+  const decryptedEquipment = equipment?.map((e) => ({
+    ...e,
+    login_password: e.login_password ? decrypt(e.login_password) : null,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -185,18 +176,6 @@ export default async function ClientEquipmentPage({
             </Card>
           </div>
 
-          {/* Export Section */}
-          <ClientEquipmentExport clientId={clientId} />
-
-          {/* Export Results */}
-          {exportResults && (
-            <ClientEquipmentExportResults
-              exportResults={exportResults}
-              filterText={filterText}
-              recordCount={recordCount}
-            />
-          )}
-
           {/* Equipment Table */}
           <Card>
             <CardHeader>
@@ -217,7 +196,10 @@ export default async function ClientEquipmentPage({
                   </p>
                 </div>
               ) : (
-                <ClientEquipmentTable equipment={equipment} />
+                <ClientEquipmentTable
+                  equipment={decryptedEquipment}
+                  showDownloadButton={true}
+                />
               )}
             </CardContent>
           </Card>

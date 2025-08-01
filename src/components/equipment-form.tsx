@@ -17,13 +17,13 @@ import { createEquipmentAction, updateEquipmentAction } from "@/app/actions";
 import { Eye, EyeOff } from "lucide-react";
 
 interface EquipmentFormProps {
-  clients: any[];
+  clientCompanyProfiles: any[];
   equipment?: any;
   onSuccess?: () => void;
 }
 
 export function EquipmentForm({
-  clients,
+  clientCompanyProfiles,
   equipment,
   onSuccess,
 }: EquipmentFormProps) {
@@ -131,26 +131,28 @@ export function EquipmentForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="client_credential_id">Assign to Client</Label>
+          <Label htmlFor="client_company_profile_id">
+            Assign to Client Company
+          </Label>
           <Select
-            name="client_credential_id"
-            defaultValue={equipment?.client_credential_id || ""}
+            name="client_company_profile_id"
+            defaultValue={equipment?.client_company_profile_id || ""}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select a client (optional)" />
+              <SelectValue placeholder="Select a client company (optional)" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="unassigned">Unassigned</SelectItem>
-              {clients && clients.length > 0 ? (
-                clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.full_name || client.username}
-                    {client.email && ` (${client.email})`}
+              {clientCompanyProfiles && clientCompanyProfiles.length > 0 ? (
+                clientCompanyProfiles.map((profile) => (
+                  <SelectItem key={profile.id} value={profile.id}>
+                    {profile.company_name}
+                    {profile.contact_person && ` - ${profile.contact_person}`}
                   </SelectItem>
                 ))
               ) : (
-                <SelectItem value="no-clients" disabled>
-                  No clients available
+                <SelectItem value="no-companies" disabled>
+                  No client companies available
                 </SelectItem>
               )}
             </SelectContent>

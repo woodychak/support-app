@@ -55,14 +55,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { decrypt } from "@/utils/encryption";
 
 interface EquipmentTableProps {
   equipment: any[];
-  clients: any[];
+  clientCompanyProfiles: any[];
 }
 
-export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
+export function EquipmentTable({
+  equipment,
+  clientCompanyProfiles,
+}: EquipmentTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<any>(null);
@@ -71,8 +73,10 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
   }>({});
   const [includeCredentials, setIncludeCredentials] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedClient, setSelectedClient] = useState<string>("all");
-  const filterText = selectedClient !== "all" ? selectedClient : "all-clients";
+  const [selectedClientCompany, setSelectedClientCompany] =
+    useState<string>("all");
+  const filterText =
+    selectedClientCompany !== "all" ? selectedClientCompany : "all-companies";
   const { toast } = useToast();
 
   const handleDelete = (equipment: any) => {
@@ -144,9 +148,8 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
           const row = [
             record.device_name,
             record.device_type || "",
-            record.client_credentials
-              ? record.client_credentials.full_name ||
-                record.client_credentials.username
+            record.client_company_profiles
+              ? record.client_company_profiles.company_name
               : "Unassigned",
             record.device_ip_address || record.device_url || "",
             record.status,
@@ -179,12 +182,12 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
         item.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesClient =
-        selectedClient === "all" ||
-        String(item.client_credential_id) === selectedClient;
+        selectedClientCompany === "all" ||
+        String(item.client_company_profile_id) === selectedClientCompany;
 
       return matchesSearch && matchesClient;
     });
-  }, [equipment, searchTerm, selectedClient]);
+  }, [equipment, searchTerm, selectedClientCompany]);
 
   return (
     <>
@@ -207,16 +210,19 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
           </Button>
         </div>
         <div className="w-full sm:w-64">
-          <Select value={selectedClient} onValueChange={setSelectedClient}>
+          <Select
+            value={selectedClientCompany}
+            onValueChange={setSelectedClientCompany}
+          >
             <SelectTrigger>
               <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by client" />
+              <SelectValue placeholder="Filter by client company" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Clients</SelectItem>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.full_name || client.username}
+              <SelectItem value="all">All Client Companies</SelectItem>
+              {clientCompanyProfiles.map((profile) => (
+                <SelectItem key={profile.id} value={profile.id}>
+                  {profile.company_name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -230,7 +236,7 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
             <TableRow>
               <TableHead>Device Name</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Client</TableHead>
+              <TableHead>Client Company</TableHead>
               <TableHead>IP/URL</TableHead>
               <TableHead>Login Details</TableHead>
               <TableHead>Status</TableHead>
@@ -261,9 +267,8 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
                     </TableCell>
                     <TableCell>{item.device_type || "-"}</TableCell>
                     <TableCell>
-                      {item.client_credentials
-                        ? item.client_credentials.full_name ||
-                          item.client_credentials.username
+                      {item.client_company_profiles
+                        ? item.client_company_profiles.company_name
                         : "Unassigned"}
                     </TableCell>
                     <TableCell>
@@ -345,9 +350,7 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
                                 size="sm"
                                 onClick={() =>
                                   copyToClipboard(
-                                    isPasswordVisible(item.id)
-                                      ? decryptPassword(item.login_password)
-                                      : item.login_password,
+                                    item.login_password,
                                     "Password",
                                   )
                                 }
@@ -437,7 +440,7 @@ export function EquipmentTable({ equipment, clients }: EquipmentTableProps) {
           </DialogHeader>
           {selectedEquipment && (
             <EquipmentForm
-              clients={clients}
+              clientCompanyProfiles={clientCompanyProfiles}
               equipment={selectedEquipment}
               onSuccess={() => setEditDialogOpen(false)}
             />
