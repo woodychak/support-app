@@ -514,10 +514,40 @@ export const clientSignInAction = async (formData: FormData) => {
     return encodedRedirect("error", "/client-portal", "Invalid credentials");
   }
 
-  // Store client session with role information (simplified - in production use proper session management)
+  // Generate a secure session token
+  const sessionToken = Buffer.from(
+    `${clientData.id}:${Date.now()}:${Math.random().toString(36)}`,
+  ).toString("base64");
+
+  // Store session in database with expiration (24 hours)
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  await supabase.from("client_sessions").insert({
+    client_id: clientData.id,
+    session_token: sessionToken,
+    expires_at: expiresAt,
+    created_at: new Date().toISOString(),
+  });
+
+  // Store client session with role information and session token
   return redirect(
-    `/client-portal/dashboard?client_id=${clientData.id}&role=${clientData.role}`,
+    `/client-portal/dashboard?client_id=${clientData.id}&role=${clientData.role}&session=${encodeURIComponent(sessionToken)}`,
   );
+};
+
+export const clientSignOutAction = async (formData: FormData) => {
+  const sessionToken = formData.get("session_token")?.toString();
+  const supabase = await createClient();
+
+  if (sessionToken) {
+    // Invalidate the session in database
+    await supabase
+      .from("client_sessions")
+      .delete()
+      .eq("session_token", sessionToken);
+  }
+
+  return redirect("/client-portal");
 };
 
 export const updateUserProfileAction = async (formData: FormData) => {
@@ -996,7 +1026,9 @@ export const addOnsiteSupportAction = async (formData: FormData) => {
   const checkInTime = formData.get("check_in_time")?.toString();
   const checkOutTime = formData.get("check_out_time")?.toString();
   const jobDetails = formData.get("job_details")?.toString();
-  const clientId = formData.get("client_id")?.toString();
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString();
   const supabase = await createClient();
 
   const {
@@ -1030,20 +1062,19 @@ export const addOnsiteSupportAction = async (formData: FormData) => {
     );
   }
 
-  // Verify client belongs to user's company if client is selected
-  if (clientId) {
-    const { data: clientData, error: clientError } = await supabase
-      .from("client_credentials")
+  // Verify client company profile exists if selected
+  if (clientCompanyProfileId && clientCompanyProfileId !== "none") {
+    const { data: profileData, error: profileError } = await supabase
+      .from("client_company_profiles")
       .select("id")
-      .eq("id", clientId)
-      .eq("company_id", userData.company_id)
+      .eq("id", clientCompanyProfileId)
       .single();
 
-    if (clientError || !clientData) {
+    if (profileError || !profileData) {
       return encodedRedirect(
         "error",
         "/dashboard/onsite-support",
-        "Invalid client selection",
+        "Invalid client company selection",
       );
     }
   }
@@ -1054,7 +1085,10 @@ export const addOnsiteSupportAction = async (formData: FormData) => {
     check_in_time: checkInTime || null,
     check_out_time: checkOutTime || null,
     job_details: jobDetails || null,
-    client_credential_id: clientId || null,
+    client_company_profile_id:
+      clientCompanyProfileId && clientCompanyProfileId !== "none"
+        ? clientCompanyProfileId
+        : null,
     company_id: userData.company_id,
   });
 
@@ -1588,7 +1622,9 @@ export const updateOnsiteSupportAction = async (formData: FormData) => {
   const checkInTime = formData.get("check_in_time")?.toString();
   const checkOutTime = formData.get("check_out_time")?.toString();
   const jobDetails = formData.get("job_details")?.toString();
-  const clientId = formData.get("client_id")?.toString();
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString();
   const supabase = await createClient();
 
   const {
@@ -1638,20 +1674,19 @@ export const updateOnsiteSupportAction = async (formData: FormData) => {
     );
   }
 
-  // Verify client belongs to user's company if client is selected
-  if (clientId && clientId !== "none") {
-    const { data: clientData, error: clientError } = await supabase
-      .from("client_credentials")
+  // Verify client company profile exists if selected
+  if (clientCompanyProfileId && clientCompanyProfileId !== "none") {
+    const { data: profileData, error: profileError } = await supabase
+      .from("client_company_profiles")
       .select("id")
-      .eq("id", clientId)
-      .eq("company_id", userData.company_id)
+      .eq("id", clientCompanyProfileId)
       .single();
 
-    if (clientError || !clientData) {
+    if (profileError || !profileData) {
       return encodedRedirect(
         "error",
         "/dashboard/onsite-support",
-        "Invalid client selection",
+        "Invalid client company selection",
       );
     }
   }
@@ -1664,7 +1699,10 @@ export const updateOnsiteSupportAction = async (formData: FormData) => {
       check_in_time: checkInTime || null,
       check_out_time: checkOutTime || null,
       job_details: jobDetails || null,
-      client_credential_id: clientId && clientId !== "none" ? clientId : null,
+      client_company_profile_id:
+        clientCompanyProfileId && clientCompanyProfileId !== "none"
+          ? clientCompanyProfileId
+          : null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", recordId);
@@ -1807,11 +1845,11 @@ export const exportOnsiteSupportAction = async (formData: FormData) => {
     .select(
       `
       *,
-      client_credentials(
+      client_company_profiles(
         id,
-        username,
-        full_name,
-        email
+        company_name,
+        contact_person,
+        contact_email
       )
     `,
     )
@@ -1882,10 +1920,14 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
   const startDate = formData.get("start_date")?.toString();
   const endDate = formData.get("end_date")?.toString();
   const clientId = formData.get("client_id")?.toString();
+  const sessionToken = formData.get("session_token")?.toString();
   const supabase = await createClient();
 
   if (!clientId) {
-    return encodedRedirect("error", "/client-portal", "Client ID is required");
+    const redirectUrl = sessionToken
+      ? `/client-portal?session=${encodeURIComponent(sessionToken)}`
+      : "/client-portal";
+    return encodedRedirect("error", redirectUrl, "Client ID is required");
   }
 
   // Get client data to verify and get company_id
@@ -1897,10 +1939,28 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
     .single();
 
   if (clientError || !clientData) {
+    const redirectUrl = sessionToken
+      ? `/client-portal?session=${encodeURIComponent(sessionToken)}`
+      : "/client-portal";
+    return encodedRedirect("error", redirectUrl, "Invalid client credentials");
+  }
+
+  // Get client's company profile ID
+  const { data: clientCredential } = await supabase
+    .from("client_credentials")
+    .select("client_company_profile_id")
+    .eq("id", clientId)
+    .single();
+
+  if (!clientCredential?.client_company_profile_id) {
+    const baseUrl = `/client-portal/onsite-support?client_id=${clientId}`;
+    const redirectUrl = sessionToken
+      ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+      : baseUrl;
     return encodedRedirect(
       "error",
-      "/client-portal",
-      "Invalid client credentials",
+      redirectUrl,
+      "No company profile associated with this client",
     );
   }
 
@@ -1910,36 +1970,52 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
     .select(
       `
       *,
-      client_credentials(
+      client_company_profiles(
         id,
-        username,
-        full_name,
-        email
+        company_name,
+        contact_person,
+        contact_email
       )
     `,
     )
     .eq("company_id", clientData.company_id)
-    .eq("client_credential_id", clientId)
+    .eq("client_company_profile_id", clientId)
     .order("work_date", { ascending: false });
 
   // Apply filters only if filterType is not "all"
   if (filterType === "date_range") {
     if (!startDate || !endDate) {
+      const baseUrl = `/client-portal/onsite-support?client_id=${clientId}`;
+      const redirectUrl = sessionToken
+        ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+        : baseUrl;
       return encodedRedirect(
         "error",
-        `/client-portal/onsite-support?client_id=${clientId}`,
+        redirectUrl,
         "Start date and end date are required for date range filter",
       );
     }
     query = query.gte("work_date", startDate).lte("work_date", endDate);
   } else if (filterType === "month") {
     if (!startDate) {
+      const baseUrl = `/client-portal/onsite-support?client_id=${clientId}`;
+      const redirectUrl = sessionToken
+        ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+        : baseUrl;
       return encodedRedirect(
         "error",
-        `/client-portal/onsite-support?client_id=${clientId}`,
+        redirectUrl,
         "Start date is required for month filter",
       );
     }
+    console.log(
+      "Filter type:",
+      filterType,
+      "Start:",
+      startDate,
+      "End:",
+      endDate,
+    );
     // Use start date to determine month
     const monthStart = startDate.substring(0, 7) + "-01";
     const monthEnd = new Date(
@@ -1956,9 +2032,13 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
 
   if (error) {
     console.error("Error fetching records for export:", error);
+    const baseUrl = `/client-portal/onsite-support?client_id=${clientId}`;
+    const redirectUrl = sessionToken
+      ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+      : baseUrl;
     return encodedRedirect(
       "error",
-      `/client-portal/onsite-support?client_id=${clientId}`,
+      redirectUrl,
       "Failed to fetch records for export",
     );
   }
@@ -1976,7 +2056,10 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
 
   // Store the records in URL params to display them
   const recordsParam = encodeURIComponent(JSON.stringify(records || []));
-  const redirectUrl = `/client-portal/onsite-support?client_id=${clientId}&export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}`;
+  const baseUrl = `/client-portal/onsite-support?client_id=${clientId}&export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}`;
+  const redirectUrl = sessionToken
+    ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+    : baseUrl;
 
   return redirect(redirectUrl);
 };

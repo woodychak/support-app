@@ -30,11 +30,15 @@ interface ClientExportResultsProps {
 
 interface ClientOnsiteSupportExportProps {
   clientId: string;
+  sessionToken: string;
 }
 
 export function ClientOnsiteSupportExport({
   clientId,
+  sessionToken,
 }: ClientOnsiteSupportExportProps) {
+  // Get session token from URL
+
   return (
     <Card className="max-w-4xl">
       <CardHeader>
@@ -50,6 +54,9 @@ export function ClientOnsiteSupportExport({
       <CardContent>
         <form action={exportClientOnsiteSupportAction} className="space-y-4">
           <input type="hidden" name="client_id" value={clientId} />
+          {sessionToken && (
+            <input type="hidden" name="session_token" value={sessionToken} />
+          )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label htmlFor="filter_type">Filter Type</Label>

@@ -83,14 +83,14 @@ export function OnsiteSupportExport() {
             </div>
           </div>
           <div className="bg-muted p-4 rounded-lg">
-            <p className="text-sm text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               <strong>Filter Instructions:</strong>
               <br />• <strong>All Records:</strong> Leave dates empty and select
               "All Records"
               <br />• <strong>Date Range:</strong> Select start and end dates
               <br />• <strong>Specific Month:</strong> Select start date as
               first day of month, end date as last day
-            </p>
+            </span>
           </div>
         </form>
       </CardContent>
@@ -207,7 +207,7 @@ export function ExportResults({
         {exportResultsWithHours.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Download className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No records found for the selected criteria.</p>
+            <span>No records found for the selected criteria.</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -225,9 +225,8 @@ export function ExportResults({
               </thead>
               <tbody>
                 {exportResultsWithHours.map((record: any) => {
-                  const clientName = record.client_credentials
-                    ? record.client_credentials.full_name ||
-                      record.client_credentials.username
+                  const clientName = record.client_company_profiles
+                    ? record.client_company_profiles.company_name
                     : "No specific client";
 
                   return (
