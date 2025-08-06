@@ -311,7 +311,7 @@ export default async function ClientOnsiteSupportPage({
             {/* Export Section */}
             <ClientOnsiteSupportExport
               clientId={clientId}
-              sessionToken={searchParams.session}
+              sessionToken={sessionToken ?? ""}
             />
 
             {/* Export Results */}
