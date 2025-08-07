@@ -58,10 +58,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  OnsiteSupportExport,
-  ExportResults,
-} from "@/components/onsite-support-export";
+import { OnsiteSupportExport } from "@/components/onsite-support-export";
+
 import Link from "next/link";
 
 interface OnsiteSupportPageProps {
@@ -324,16 +322,89 @@ export default async function OnsiteSupportPage({
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Onsite Support Records</span>
-                <div className="flex items-center gap-2 text-sm bg-blue-50 px-3 py-1 rounded-lg">
-                  <Timer className="h-4 w-4 text-blue-600" />
-                  <span className="font-medium text-blue-900">
-                    {filteredHours.toFixed(1)}h{" "}
-                    {currentFilter === "this_month"
-                      ? "this month"
-                      : currentFilter === "last_month"
-                        ? "last month"
-                        : "total"}
-                  </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-sm bg-blue-50 px-3 py-1 rounded-lg">
+                    <Timer className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-blue-900">
+                      {filteredHours.toFixed(1)}h{" "}
+                      {currentFilter === "this_month"
+                        ? "this month"
+                        : currentFilter === "last_month"
+                          ? "last month"
+                          : "total"}
+                    </span>
+                  </div>
+                  <form
+                    action="/api/download/admin-onsite-excel"
+                    method="POST"
+                    className="inline"
+                  >
+                    <input type="hidden" name="filter_type" value="current" />
+                    {currentFilter === "this_month" && (
+                      <>
+                        <input
+                          type="hidden"
+                          name="start_date"
+                          value={
+                            new Date(
+                              new Date().getFullYear(),
+                              new Date().getMonth(),
+                              1,
+                            )
+                              .toISOString()
+                              .split("T")[0]
+                          }
+                        />
+                        <input
+                          type="hidden"
+                          name="end_date"
+                          value={
+                            new Date(
+                              new Date().getFullYear(),
+                              new Date().getMonth() + 1,
+                              0,
+                            )
+                              .toISOString()
+                              .split("T")[0]
+                          }
+                        />
+                      </>
+                    )}
+                    {currentFilter === "last_month" && (
+                      <>
+                        <input
+                          type="hidden"
+                          name="start_date"
+                          value={
+                            new Date(
+                              new Date().getFullYear(),
+                              new Date().getMonth() - 1,
+                              1,
+                            )
+                              .toISOString()
+                              .split("T")[0]
+                          }
+                        />
+                        <input
+                          type="hidden"
+                          name="end_date"
+                          value={
+                            new Date(
+                              new Date().getFullYear(),
+                              new Date().getMonth(),
+                              0,
+                            )
+                              .toISOString()
+                              .split("T")[0]
+                          }
+                        />
+                      </>
+                    )}
+                    <Button type="submit" size="sm" variant="outline">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Download Excel
+                    </Button>
+                  </form>
                 </div>
               </CardTitle>
               <CardDescription className="flex items-center justify-between">
@@ -718,16 +789,6 @@ export default async function OnsiteSupportPage({
               )}
             </CardContent>
           </Card>
-
-          {/* Export Section */}
-          <OnsiteSupportExport />
-
-          {/* Export Results */}
-          <ExportResults
-            exportResults={exportResults}
-            filterText={filterText}
-            recordCount={recordCount}
-          />
         </div>
       </main>
     </>

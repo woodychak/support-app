@@ -17,10 +17,7 @@ import {
   FileText,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  ClientOnsiteSupportExport,
-  ClientExportResults,
-} from "@/components/client-onsite-support-export";
+import { ClientOnsiteSupportExport } from "@/components/client-onsite-support-export";
 import ClientOnsiteSupportTable from "@/components/ClientOnsiteSupportTable";
 
 interface ClientOnsiteSupportPageProps {
@@ -129,15 +126,6 @@ export default async function ClientOnsiteSupportPage({
     return { ...record, totalHours };
   });
 
-  // Parse export results if available
-  const exportResults = params.export_results
-    ? JSON.parse(decodeURIComponent(params.export_results))
-    : null;
-  const filterText = params.filter_text
-    ? decodeURIComponent(params.filter_text)
-    : "";
-  const recordCount = params.record_count ? parseInt(params.record_count) : 0;
-
   return (
     <>
       <script
@@ -210,22 +198,101 @@ export default async function ClientOnsiteSupportPage({
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Your Onsite Support Records</span>
-                  <div className="flex items-center gap-2 text-sm bg-blue-50 px-3 py-1 rounded-lg">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium text-blue-900">
-                      {recordsWithHours
-                        ?.reduce((total, record) => {
-                          const hours = parseFloat(record.totalHours || "0");
-                          return total + (isNaN(hours) ? 0 : hours);
-                        }, 0)
-                        .toFixed(1) || "0.0"}
-                      h{" "}
-                      {currentFilter === "this_month"
-                        ? "this month"
-                        : currentFilter === "last_month"
-                          ? "last month"
-                          : "total"}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-sm bg-blue-50 px-3 py-1 rounded-lg">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      <span className="font-medium text-blue-900">
+                        {recordsWithHours
+                          ?.reduce((total, record) => {
+                            const hours = parseFloat(record.totalHours || "0");
+                            return total + (isNaN(hours) ? 0 : hours);
+                          }, 0)
+                          .toFixed(1) || "0.0"}
+                        h{" "}
+                        {currentFilter === "this_month"
+                          ? "this month"
+                          : currentFilter === "last_month"
+                            ? "last month"
+                            : "total"}
+                      </span>
+                    </div>
+                    <form
+                      action="/api/download/client-onsite-excel"
+                      method="POST"
+                      className="inline"
+                    >
+                      <input type="hidden" name="client_id" value={clientId} />
+                      <input
+                        type="hidden"
+                        name="session_token"
+                        value={sessionToken}
+                      />
+                      <input type="hidden" name="filter_type" value="current" />
+                      {currentFilter === "this_month" && (
+                        <>
+                          <input
+                            type="hidden"
+                            name="start_date"
+                            value={
+                              new Date(
+                                new Date().getFullYear(),
+                                new Date().getMonth(),
+                                1,
+                              )
+                                .toISOString()
+                                .split("T")[0]
+                            }
+                          />
+                          <input
+                            type="hidden"
+                            name="end_date"
+                            value={
+                              new Date(
+                                new Date().getFullYear(),
+                                new Date().getMonth() + 1,
+                                0,
+                              )
+                                .toISOString()
+                                .split("T")[0]
+                            }
+                          />
+                        </>
+                      )}
+                      {currentFilter === "last_month" && (
+                        <>
+                          <input
+                            type="hidden"
+                            name="start_date"
+                            value={
+                              new Date(
+                                new Date().getFullYear(),
+                                new Date().getMonth() - 1,
+                                1,
+                              )
+                                .toISOString()
+                                .split("T")[0]
+                            }
+                          />
+                          <input
+                            type="hidden"
+                            name="end_date"
+                            value={
+                              new Date(
+                                new Date().getFullYear(),
+                                new Date().getMonth(),
+                                0,
+                              )
+                                .toISOString()
+                                .split("T")[0]
+                            }
+                          />
+                        </>
+                      )}
+                      <Button type="submit" size="sm" variant="outline">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Download Excel
+                      </Button>
+                    </form>
                   </div>
                 </CardTitle>
                 <CardDescription className="flex items-center justify-between">
@@ -307,19 +374,6 @@ export default async function ClientOnsiteSupportPage({
                 )}
               </CardContent>
             </Card>
-
-            {/* Export Section */}
-            <ClientOnsiteSupportExport
-              clientId={clientId}
-              sessionToken={searchParams.session}
-            />
-
-            {/* Export Results */}
-            <ClientExportResults
-              exportResults={exportResults}
-              filterText={filterText}
-              recordCount={recordCount}
-            />
           </div>
         </main>
       </div>

@@ -233,16 +233,14 @@ export default async function ClientDashboard({
                     Onsite Reports
                   </Button>
                 </Link>
-                {userRole === "admin" && (
-                  <Link
-                    href={`/client-portal/equipment?client_id=${clientId}&role=${userRole}&session=${encodeURIComponent(sessionToken)}`}
-                  >
-                    <Button variant="outline">
-                      <Monitor className="h-4 w-4 mr-2" />
-                      Equipment
-                    </Button>
-                  </Link>
-                )}
+                <Link
+                  href={`/client-portal/equipment?client_id=${clientId}&role=${userRole}&session=${encodeURIComponent(sessionToken)}`}
+                >
+                  <Button variant="outline">
+                    <Monitor className="h-4 w-4 mr-2" />
+                    Equipment
+                  </Button>
+                </Link>
                 {!showClosed && ticketStats.closed > 0 && (
                   <Link
                     href={`/client-portal/dashboard?client_id=${clientId}&show_closed=true&role=${userRole}&session=${encodeURIComponent(sessionToken)}`}

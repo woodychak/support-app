@@ -1856,8 +1856,13 @@ export const exportOnsiteSupportAction = async (formData: FormData) => {
     .eq("company_id", userData.company_id)
     .order("work_date", { ascending: false });
 
-  // Apply filters only if filterType is not "all"
-  if (filterType === "date_range") {
+  // Apply filters based on filter type
+  if (filterType === "current") {
+    // Use the provided start and end dates for current filter
+    if (startDate && endDate) {
+      query = query.gte("work_date", startDate).lte("work_date", endDate);
+    }
+  } else if (filterType === "date_range") {
     if (!startDate || !endDate) {
       return encodedRedirect(
         "error",
@@ -1900,7 +1905,9 @@ export const exportOnsiteSupportAction = async (formData: FormData) => {
   const recordCount = records?.length || 0;
   let filterText = "";
 
-  if (filterType === "date_range" && startDate && endDate) {
+  if (filterType === "current" && startDate && endDate) {
+    filterText = ` (${startDate} to ${endDate})`;
+  } else if (filterType === "date_range" && startDate && endDate) {
     filterText = ` (${startDate} to ${endDate})`;
   } else if (filterType === "month" && startDate) {
     filterText = ` (${startDate.substring(0, 7)})`;
