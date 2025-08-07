@@ -14,8 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      client_company_profiles: {
+        Row: {
+          address: string | null
+          company_name: string
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          logo_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          company_name: string
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_name?: string
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       client_credentials: {
         Row: {
+          client_company_profile_id: string | null
           company_id: string
           created_at: string
           email: string | null
@@ -23,10 +63,12 @@ export type Database = {
           id: string
           is_active: boolean | null
           password_hash: string
+          role: string | null
           updated_at: string | null
           username: string
         }
         Insert: {
+          client_company_profile_id?: string | null
           company_id: string
           created_at?: string
           email?: string | null
@@ -34,10 +76,12 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           password_hash: string
+          role?: string | null
           updated_at?: string | null
           username: string
         }
         Update: {
+          client_company_profile_id?: string | null
           company_id?: string
           created_at?: string
           email?: string | null
@@ -45,15 +89,55 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           password_hash?: string
+          role?: string | null
           updated_at?: string | null
           username?: string
         }
         Relationships: [
           {
+            foreignKeyName: "client_credentials_client_company_profile_id_fkey"
+            columns: ["client_company_profile_id"]
+            isOneToOne: false
+            referencedRelation: "client_company_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "client_credentials_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_sessions: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          session_token: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          session_token: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          session_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_sessions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_credentials"
             referencedColumns: ["id"]
           },
         ]
@@ -200,6 +284,72 @@ export type Database = {
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipment_inventory: {
+        Row: {
+          client_company_profile_id: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          device_ip_address: string | null
+          device_name: string
+          device_type: string | null
+          device_url: string | null
+          id: string
+          location: string | null
+          login_password: string | null
+          login_username: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_company_profile_id?: string | null
+          company_id: string
+          created_at?: string
+          description?: string | null
+          device_ip_address?: string | null
+          device_name: string
+          device_type?: string | null
+          device_url?: string | null
+          id?: string
+          location?: string | null
+          login_password?: string | null
+          login_username?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_company_profile_id?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          device_ip_address?: string | null
+          device_name?: string
+          device_type?: string | null
+          device_url?: string | null
+          id?: string
+          location?: string | null
+          login_password?: string | null
+          login_username?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_inventory_client_company_profile_id_fkey"
+            columns: ["client_company_profile_id"]
+            isOneToOne: false
+            referencedRelation: "client_company_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_inventory_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "../../supabase/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { encrypt, decrypt } from "@/utils/encryption";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
@@ -248,6 +249,10 @@ export const createClientCredentialAction = async (formData: FormData) => {
   const password = formData.get("password")?.toString();
   const email = formData.get("email")?.toString();
   const fullName = formData.get("full_name")?.toString();
+  const role = formData.get("role")?.toString() || "user";
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString();
   const supabase = await createClient();
 
   const {
@@ -290,6 +295,8 @@ export const createClientCredentialAction = async (formData: FormData) => {
     password_hash: passwordHash,
     email,
     full_name: fullName,
+    role,
+    client_company_profile_id: clientCompanyProfileId || null,
     is_active: true,
   });
 
@@ -315,6 +322,10 @@ export const updateClientCredentialAction = async (formData: FormData) => {
   const password = formData.get("password")?.toString();
   const email = formData.get("email")?.toString();
   const fullName = formData.get("full_name")?.toString();
+  const role = formData.get("role")?.toString() || "user";
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString();
   const isActive = formData.get("is_active") === "on";
   const supabase = await createClient();
 
@@ -370,6 +381,8 @@ export const updateClientCredentialAction = async (formData: FormData) => {
     username,
     email,
     full_name: fullName,
+    role,
+    client_company_profile_id: clientCompanyProfileId || null,
     is_active: isActive,
     updated_at: new Date().toISOString(),
   };
@@ -491,7 +504,7 @@ export const clientSignInAction = async (formData: FormData) => {
 
   const { data: clientData, error } = await supabase
     .from("client_credentials")
-    .select("*, companies(*)")
+    .select("*, companies(*), client_company_profiles(*)")
     .eq("username", username)
     .eq("password_hash", passwordHash)
     .eq("is_active", true)
@@ -501,8 +514,40 @@ export const clientSignInAction = async (formData: FormData) => {
     return encodedRedirect("error", "/client-portal", "Invalid credentials");
   }
 
-  // Store client session (simplified - in production use proper session management)
-  return redirect(`/client-portal/dashboard?client_id=${clientData.id}`);
+  // Generate a secure session token
+  const sessionToken = Buffer.from(
+    `${clientData.id}:${Date.now()}:${Math.random().toString(36)}`,
+  ).toString("base64");
+
+  // Store session in database with expiration (24 hours)
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  await supabase.from("client_sessions").insert({
+    client_id: clientData.id,
+    session_token: sessionToken,
+    expires_at: expiresAt,
+    created_at: new Date().toISOString(),
+  });
+
+  // Store client session with role information and session token
+  return redirect(
+    `/client-portal/dashboard?client_id=${clientData.id}&role=${clientData.role}&session=${encodeURIComponent(sessionToken)}`,
+  );
+};
+
+export const clientSignOutAction = async (formData: FormData) => {
+  const sessionToken = formData.get("session_token")?.toString();
+  const supabase = await createClient();
+
+  if (sessionToken) {
+    // Invalidate the session in database
+    await supabase
+      .from("client_sessions")
+      .delete()
+      .eq("session_token", sessionToken);
+  }
+
+  return redirect("/client-portal");
 };
 
 export const updateUserProfileAction = async (formData: FormData) => {
@@ -981,7 +1026,9 @@ export const addOnsiteSupportAction = async (formData: FormData) => {
   const checkInTime = formData.get("check_in_time")?.toString();
   const checkOutTime = formData.get("check_out_time")?.toString();
   const jobDetails = formData.get("job_details")?.toString();
-  const clientId = formData.get("client_id")?.toString();
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString();
   const supabase = await createClient();
 
   const {
@@ -1015,20 +1062,19 @@ export const addOnsiteSupportAction = async (formData: FormData) => {
     );
   }
 
-  // Verify client belongs to user's company if client is selected
-  if (clientId) {
-    const { data: clientData, error: clientError } = await supabase
-      .from("client_credentials")
+  // Verify client company profile exists if selected
+  if (clientCompanyProfileId && clientCompanyProfileId !== "none") {
+    const { data: profileData, error: profileError } = await supabase
+      .from("client_company_profiles")
       .select("id")
-      .eq("id", clientId)
-      .eq("company_id", userData.company_id)
+      .eq("id", clientCompanyProfileId)
       .single();
 
-    if (clientError || !clientData) {
+    if (profileError || !profileData) {
       return encodedRedirect(
         "error",
         "/dashboard/onsite-support",
-        "Invalid client selection",
+        "Invalid client company selection",
       );
     }
   }
@@ -1039,7 +1085,10 @@ export const addOnsiteSupportAction = async (formData: FormData) => {
     check_in_time: checkInTime || null,
     check_out_time: checkOutTime || null,
     job_details: jobDetails || null,
-    client_credential_id: clientId || null,
+    client_company_profile_id:
+      clientCompanyProfileId && clientCompanyProfileId !== "none"
+        ? clientCompanyProfileId
+        : null,
     company_id: userData.company_id,
   });
 
@@ -1208,29 +1257,29 @@ export const createStaffAccountAction = async (formData: FormData) => {
 
   // 檢查 Auth 內是否已有此 email 使用者
   const { data: listUsersData, error: listUsersError } =
-  await supabaseAdmin.auth.admin.listUsers({
-    page: 1,
-    perPage: 1000,
-  });
+    await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
 
-if (listUsersError) {
-  console.error("Failed to list users:", listUsersError);
-  return encodedRedirect(
-    "error",
-    "/dashboard/staff",
-    "Failed to check existing users."
-  );
-}
+  if (listUsersError) {
+    console.error("Failed to list users:", listUsersError);
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "Failed to check existing users.",
+    );
+  }
 
-const userExists = listUsersData?.users.some((user) => user.email === email);
+  const userExists = listUsersData?.users.some((user) => user.email === email);
 
-if (userExists) {
-  return encodedRedirect(
-    "error",
-    "/dashboard/staff",
-    "User already exists with this email."
-  );
-}
+  if (userExists) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/staff",
+      "User already exists with this email.",
+    );
+  }
 
   try {
     console.log("🔧 Creating auth user:", email);
@@ -1573,7 +1622,9 @@ export const updateOnsiteSupportAction = async (formData: FormData) => {
   const checkInTime = formData.get("check_in_time")?.toString();
   const checkOutTime = formData.get("check_out_time")?.toString();
   const jobDetails = formData.get("job_details")?.toString();
-  const clientId = formData.get("client_id")?.toString();
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString();
   const supabase = await createClient();
 
   const {
@@ -1623,20 +1674,19 @@ export const updateOnsiteSupportAction = async (formData: FormData) => {
     );
   }
 
-  // Verify client belongs to user's company if client is selected
-  if (clientId && clientId !== "none") {
-    const { data: clientData, error: clientError } = await supabase
-      .from("client_credentials")
+  // Verify client company profile exists if selected
+  if (clientCompanyProfileId && clientCompanyProfileId !== "none") {
+    const { data: profileData, error: profileError } = await supabase
+      .from("client_company_profiles")
       .select("id")
-      .eq("id", clientId)
-      .eq("company_id", userData.company_id)
+      .eq("id", clientCompanyProfileId)
       .single();
 
-    if (clientError || !clientData) {
+    if (profileError || !profileData) {
       return encodedRedirect(
         "error",
         "/dashboard/onsite-support",
-        "Invalid client selection",
+        "Invalid client company selection",
       );
     }
   }
@@ -1649,7 +1699,10 @@ export const updateOnsiteSupportAction = async (formData: FormData) => {
       check_in_time: checkInTime || null,
       check_out_time: checkOutTime || null,
       job_details: jobDetails || null,
-      client_credential_id: clientId && clientId !== "none" ? clientId : null,
+      client_company_profile_id:
+        clientCompanyProfileId && clientCompanyProfileId !== "none"
+          ? clientCompanyProfileId
+          : null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", recordId);
@@ -1792,19 +1845,24 @@ export const exportOnsiteSupportAction = async (formData: FormData) => {
     .select(
       `
       *,
-      client_credentials(
+      client_company_profiles(
         id,
-        username,
-        full_name,
-        email
+        company_name,
+        contact_person,
+        contact_email
       )
     `,
     )
     .eq("company_id", userData.company_id)
     .order("work_date", { ascending: false });
 
-  // Apply filters only if filterType is not "all"
-  if (filterType === "date_range") {
+  // Apply filters based on filter type
+  if (filterType === "current") {
+    // Use the provided start and end dates for current filter
+    if (startDate && endDate) {
+      query = query.gte("work_date", startDate).lte("work_date", endDate);
+    }
+  } else if (filterType === "date_range") {
     if (!startDate || !endDate) {
       return encodedRedirect(
         "error",
@@ -1847,7 +1905,9 @@ export const exportOnsiteSupportAction = async (formData: FormData) => {
   const recordCount = records?.length || 0;
   let filterText = "";
 
-  if (filterType === "date_range" && startDate && endDate) {
+  if (filterType === "current" && startDate && endDate) {
+    filterText = ` (${startDate} to ${endDate})`;
+  } else if (filterType === "date_range" && startDate && endDate) {
     filterText = ` (${startDate} to ${endDate})`;
   } else if (filterType === "month" && startDate) {
     filterText = ` (${startDate.substring(0, 7)})`;
@@ -1866,6 +1926,576 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
   const filterType = formData.get("filter_type")?.toString() || "all";
   const startDate = formData.get("start_date")?.toString();
   const endDate = formData.get("end_date")?.toString();
+  const clientId = formData.get("client_id")?.toString();
+  const sessionToken = formData.get("session_token")?.toString();
+  const supabase = await createClient();
+
+  if (!clientId) {
+    const redirectUrl = sessionToken
+      ? `/client-portal?session=${encodeURIComponent(sessionToken)}`
+      : "/client-portal";
+    return encodedRedirect("error", redirectUrl, "Client ID is required");
+  }
+
+  // Get client data to verify and get company_id
+  const { data: clientData, error: clientError } = await supabase
+    .from("client_credentials")
+    .select("company_id, username, full_name, email")
+    .eq("id", clientId)
+    .eq("is_active", true)
+    .single();
+
+  if (clientError || !clientData) {
+    const redirectUrl = sessionToken
+      ? `/client-portal?session=${encodeURIComponent(sessionToken)}`
+      : "/client-portal";
+    return encodedRedirect("error", redirectUrl, "Invalid client credentials");
+  }
+
+  // Get client's company profile ID
+  const { data: clientCredential } = await supabase
+    .from("client_credentials")
+    .select("client_company_profile_id")
+    .eq("id", clientId)
+    .single();
+
+  if (!clientCredential?.client_company_profile_id) {
+    const baseUrl = `/client-portal/onsite-support?client_id=${clientId}`;
+    const redirectUrl = sessionToken
+      ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+      : baseUrl;
+    return encodedRedirect(
+      "error",
+      redirectUrl,
+      "No company profile associated with this client",
+    );
+  }
+
+  // Build query based on filter - only get records for this client
+  let query = supabase
+    .from("onsite_support")
+    .select(
+      `
+      *,
+      client_company_profiles(
+        id,
+        company_name,
+        contact_person,
+        contact_email
+      )
+    `,
+    )
+    .eq("company_id", clientData.company_id)
+    .eq("client_company_profile_id", clientId)
+    .order("work_date", { ascending: false });
+
+  // Apply filters only if filterType is not "all"
+  if (filterType === "date_range") {
+    if (!startDate || !endDate) {
+      const baseUrl = `/client-portal/onsite-support?client_id=${clientId}`;
+      const redirectUrl = sessionToken
+        ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+        : baseUrl;
+      return encodedRedirect(
+        "error",
+        redirectUrl,
+        "Start date and end date are required for date range filter",
+      );
+    }
+    query = query.gte("work_date", startDate).lte("work_date", endDate);
+  } else if (filterType === "month") {
+    if (!startDate) {
+      const baseUrl = `/client-portal/onsite-support?client_id=${clientId}`;
+      const redirectUrl = sessionToken
+        ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+        : baseUrl;
+      return encodedRedirect(
+        "error",
+        redirectUrl,
+        "Start date is required for month filter",
+      );
+    }
+    console.log(
+      "Filter type:",
+      filterType,
+      "Start:",
+      startDate,
+      "End:",
+      endDate,
+    );
+    // Use start date to determine month
+    const monthStart = startDate.substring(0, 7) + "-01";
+    const monthEnd = new Date(
+      new Date(monthStart).getFullYear(),
+      new Date(monthStart).getMonth() + 1,
+      0,
+    )
+      .toISOString()
+      .split("T")[0];
+    query = query.gte("work_date", monthStart).lte("work_date", monthEnd);
+  }
+
+  const { data: records, error } = await query;
+
+  if (error) {
+    console.error("Error fetching records for export:", error);
+    const baseUrl = `/client-portal/onsite-support?client_id=${clientId}`;
+    const redirectUrl = sessionToken
+      ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+      : baseUrl;
+    return encodedRedirect(
+      "error",
+      redirectUrl,
+      "Failed to fetch records for export",
+    );
+  }
+
+  const recordCount = records?.length || 0;
+  let filterText = "";
+
+  if (filterType === "date_range" && startDate && endDate) {
+    filterText = ` (${startDate} to ${endDate})`;
+  } else if (filterType === "month" && startDate) {
+    filterText = ` (${startDate.substring(0, 7)})`;
+  } else if (filterType === "all") {
+    filterText = " (All Records)";
+  }
+
+  // Store the records in URL params to display them
+  const recordsParam = encodeURIComponent(JSON.stringify(records || []));
+  const baseUrl = `/client-portal/onsite-support?client_id=${clientId}&export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}`;
+  const redirectUrl = sessionToken
+    ? `${baseUrl}&session=${encodeURIComponent(sessionToken)}`
+    : baseUrl;
+
+  return redirect(redirectUrl);
+};
+
+// Equipment Actions
+export const createEquipmentAction = async (formData: FormData) => {
+  const deviceName = formData.get("device_name")?.toString()?.trim();
+  const deviceType = formData.get("device_type")?.toString()?.trim();
+  const deviceIpAddress = formData.get("device_ip_address")?.toString()?.trim();
+  const deviceUrl = formData.get("device_url")?.toString()?.trim();
+  const loginUsername = formData.get("login_username")?.toString()?.trim();
+  const loginPassword = formData.get("login_password")?.toString();
+  const encryptedPassword =
+    loginPassword && loginPassword !== "" ? encrypt(loginPassword) : null;
+
+  const decryptedPassword = encryptedPassword
+    ? decrypt(encryptedPassword)
+    : null;
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString()
+    ?.trim();
+  const status = formData.get("status")?.toString()?.trim() || "active";
+  const location = formData.get("location")?.toString()?.trim();
+  const description = formData.get("description")?.toString()?.trim();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!deviceName) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment/new",
+      "Device name is required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "You must have a company to create equipment records",
+    );
+  }
+
+  // Verify client company profile exists if selected
+  if (clientCompanyProfileId && clientCompanyProfileId !== "unassigned") {
+    const { data: profileData, error: profileError } = await supabase
+      .from("client_company_profiles")
+      .select("id")
+      .eq("id", clientCompanyProfileId)
+      .single();
+
+    if (profileError || !profileData) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/equipment",
+        "Invalid client company selection",
+      );
+    }
+  }
+
+  const { error } = await supabase.from("equipment_inventory").insert({
+    device_name: deviceName,
+    device_type: deviceType || null,
+    device_ip_address: deviceIpAddress || null,
+    device_url: deviceUrl || null,
+    login_username: loginUsername || null,
+    login_password: encryptedPassword,
+    client_company_profile_id:
+      clientCompanyProfileId && clientCompanyProfileId !== "unassigned"
+        ? clientCompanyProfileId
+        : null,
+    status: status,
+    location: location || null,
+    description: description || null,
+    company_id: userData.company_id,
+  });
+
+  if (error) {
+    console.error("Error creating equipment:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Failed to create equipment record",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/equipment",
+    "Equipment created successfully",
+  );
+};
+
+export const updateEquipmentAction = async (formData: FormData) => {
+  const equipmentId = formData.get("equipment_id")?.toString()?.trim();
+  const deviceName = formData.get("device_name")?.toString()?.trim();
+  const deviceType = formData.get("device_type")?.toString()?.trim();
+  const deviceIpAddress = formData.get("device_ip_address")?.toString()?.trim();
+  const deviceUrl = formData.get("device_url")?.toString()?.trim();
+  const loginUsername = formData.get("login_username")?.toString()?.trim();
+  const loginPassword = formData.get("login_password")?.toString();
+  let encryptedPassword;
+  let decryptedPassword;
+  try {
+    encryptedPassword =
+      loginPassword && loginPassword !== ""
+        ? encrypt(loginPassword)
+        : undefined;
+
+    decryptedPassword = encryptedPassword ? decrypt(encryptedPassword) : null;
+
+    console.log("🔒 Encrypted Password:", encryptedPassword);
+    console.log("🔓 Decrypted Password:", decryptedPassword);
+  } catch (e) {
+    console.error("Encryption/Decryption error:", e);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Encryption failed",
+    );
+  }
+  const clientCompanyProfileId = formData
+    .get("client_company_profile_id")
+    ?.toString()
+    ?.trim();
+  const status = formData.get("status")?.toString()?.trim() || "active";
+  const location = formData.get("location")?.toString()?.trim();
+  const description = formData.get("description")?.toString()?.trim();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!equipmentId || !deviceName) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Equipment ID and device name are required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "You must have a company to update equipment records",
+    );
+  }
+
+  // Verify equipment belongs to user's company
+  const { data: equipmentData, error: equipmentError } = await supabase
+    .from("equipment_inventory")
+    .select("id")
+    .eq("id", equipmentId)
+    .eq("company_id", userData.company_id)
+    .single();
+
+  if (equipmentError || !equipmentData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Equipment not found or access denied",
+    );
+  }
+
+  // Verify client company profile exists if selected
+  if (clientCompanyProfileId && clientCompanyProfileId !== "unassigned") {
+    const { data: profileData, error: profileError } = await supabase
+      .from("client_company_profiles")
+      .select("id")
+      .eq("id", clientCompanyProfileId)
+      .single();
+
+    if (profileError || !profileData) {
+      return encodedRedirect(
+        "error",
+        "/dashboard/equipment",
+        "Invalid client company selection",
+      );
+    }
+  }
+
+  const { error } = await supabase
+    .from("equipment_inventory")
+    .update({
+      device_name: deviceName,
+      device_type: deviceType || null,
+      device_ip_address: deviceIpAddress || null,
+      device_url: deviceUrl || null,
+      login_username: loginUsername || null,
+      login_password: encryptedPassword,
+      client_company_profile_id:
+        clientCompanyProfileId && clientCompanyProfileId !== "unassigned"
+          ? clientCompanyProfileId
+          : null,
+      status: status,
+      location: location || null,
+      description: description || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", equipmentId);
+
+  if (error) {
+    console.error("Error updating equipment:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Failed to update equipment record",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/equipment",
+    "Equipment updated successfully",
+  );
+};
+
+export const deleteEquipmentAction = async (formData: FormData) => {
+  const equipmentId = formData.get("equipment_id")?.toString();
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  if (!equipmentId) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Equipment ID is required",
+    );
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "You must have a company to delete equipment records",
+    );
+  }
+
+  // Verify equipment belongs to user's company
+  const { data: equipmentData, error: equipmentError } = await supabase
+    .from("equipment_inventory")
+    .select("id")
+    .eq("id", equipmentId)
+    .eq("company_id", userData.company_id)
+    .single();
+
+  if (equipmentError || !equipmentData) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Equipment not found or access denied",
+    );
+  }
+
+  // Delete the equipment
+  const { error } = await supabase
+    .from("equipment_inventory")
+    .delete()
+    .eq("id", equipmentId);
+
+  if (error) {
+    console.error("Error deleting equipment:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Failed to delete equipment record",
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/dashboard/equipment",
+    "Equipment deleted successfully",
+  );
+};
+
+export const exportEquipmentAction = async (formData: FormData) => {
+  const filterType = formData.get("filter_type")?.toString() || "all";
+  const filterValue = formData.get("filter_value")?.toString();
+  const includeCredentials =
+    formData.get("include_credentials")?.toString() === "true";
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/dashboard", "You must be logged in");
+  }
+
+  // Get user's company
+  const { data: userData } = await supabase
+    .from("users")
+    .select("company_id")
+    .eq("id", user.id)
+    .single();
+
+  if (!userData?.company_id) {
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "You must have a company to export equipment records",
+    );
+  }
+
+  // Build query based on filter
+  let query = supabase
+    .from("equipment_inventory")
+    .select(
+      `
+      *,
+      client_company_profiles(
+        id,
+        company_name
+      )
+    `,
+    )
+    .eq("company_id", userData.company_id)
+    .order("created_at", { ascending: false });
+
+  // Apply filters
+  if (filterType === "status" && filterValue) {
+    query = query.eq("status", filterValue.toLowerCase());
+  } else if (filterType === "type" && filterValue) {
+    query = query.ilike("device_type", `%${filterValue}%`);
+  } else if (filterType === "client" && filterValue) {
+    // This is more complex - we need to filter by client company name
+    const { data: clientCompanyData } = await supabase
+      .from("client_company_profiles")
+      .select("id")
+      .ilike("company_name", `%${filterValue}%`);
+
+    if (clientCompanyData && clientCompanyData.length > 0) {
+      const clientCompanyIds = clientCompanyData.map((c) => c.id);
+      query = query.in("client_company_profile_id", clientCompanyIds);
+    } else {
+      // No matching client companies found, return empty result
+      query = query.eq("id", "00000000-0000-0000-0000-000000000000"); // Non-existent ID
+    }
+  }
+
+  const { data: records, error } = await query;
+
+  if (error) {
+    console.error("Error fetching records for export:", error);
+    return encodedRedirect(
+      "error",
+      "/dashboard/equipment",
+      "Failed to fetch records for export",
+    );
+  }
+
+  // Decrypt passwords for export if credentials are included
+  const processedRecords = records?.map((record) => ({
+    ...record,
+    login_password:
+      record.login_password && includeCredentials
+        ? decrypt(record.login_password)
+        : record.login_password,
+  }));
+
+  const recordCount = processedRecords?.length || 0;
+  let filterText = "";
+
+  if (filterType === "status" && filterValue) {
+    filterText = ` (Status: ${filterValue})`;
+  } else if (filterType === "type" && filterValue) {
+    filterText = ` (Type: ${filterValue})`;
+  } else if (filterType === "client" && filterValue) {
+    filterText = ` (Client: ${filterValue})`;
+  } else if (filterType === "all") {
+    filterText = " (All Equipment)";
+  }
+
+  // Store the records in URL params to display them
+  const recordsParam = encodeURIComponent(
+    JSON.stringify(processedRecords || []),
+  );
+  const redirectUrl = `/dashboard/equipment?export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}&include_credentials=${includeCredentials}`;
+
+  return redirect(redirectUrl);
+};
+
+export const exportClientEquipmentAction = async (formData: FormData) => {
+  const filterType = formData.get("filter_type")?.toString() || "all";
+  const filterValue = formData.get("filter_value")?.toString();
   const clientId = formData.get("client_id")?.toString();
   const supabase = await createClient();
 
@@ -1889,52 +2519,34 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
     );
   }
 
-  // Build query based on filter - only get records for this client
-  let query = supabase
-    .from("onsite_support")
-    .select(
-      `
-      *,
-      client_credentials(
-        id,
-        username,
-        full_name,
-        email
-      )
-    `,
-    )
-    .eq("company_id", clientData.company_id)
-    .eq("client_credential_id", clientId)
-    .order("work_date", { ascending: false });
+  // Get client's company profile ID
+  const { data: clientCredential } = await supabase
+    .from("client_credentials")
+    .select("client_company_profile_id")
+    .eq("id", clientId)
+    .single();
 
-  // Apply filters only if filterType is not "all"
-  if (filterType === "date_range") {
-    if (!startDate || !endDate) {
-      return encodedRedirect(
-        "error",
-        `/client-portal/onsite-support?client_id=${clientId}`,
-        "Start date and end date are required for date range filter",
-      );
-    }
-    query = query.gte("work_date", startDate).lte("work_date", endDate);
-  } else if (filterType === "month") {
-    if (!startDate) {
-      return encodedRedirect(
-        "error",
-        `/client-portal/onsite-support?client_id=${clientId}`,
-        "Start date is required for month filter",
-      );
-    }
-    // Use start date to determine month
-    const monthStart = startDate.substring(0, 7) + "-01";
-    const monthEnd = new Date(
-      new Date(monthStart).getFullYear(),
-      new Date(monthStart).getMonth() + 1,
-      0,
-    )
-      .toISOString()
-      .split("T")[0];
-    query = query.gte("work_date", monthStart).lte("work_date", monthEnd);
+  if (!clientCredential?.client_company_profile_id) {
+    return encodedRedirect(
+      "error",
+      `/client-portal/equipment?client_id=${clientId}`,
+      "No company profile associated with this client",
+    );
+  }
+
+  // Build query based on filter - only get records for this client's company
+  let query = supabase
+    .from("equipment_inventory")
+    .select("*")
+    .eq("company_id", clientData.company_id)
+    .eq("client_company_profile_id", clientCredential.client_company_profile_id)
+    .order("created_at", { ascending: false });
+
+  // Apply filters
+  if (filterType === "status" && filterValue) {
+    query = query.eq("status", filterValue.toLowerCase());
+  } else if (filterType === "type" && filterValue) {
+    query = query.ilike("device_type", `%${filterValue}%`);
   }
 
   const { data: records, error } = await query;
@@ -1943,7 +2555,7 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
     console.error("Error fetching records for export:", error);
     return encodedRedirect(
       "error",
-      `/client-portal/onsite-support?client_id=${clientId}`,
+      `/client-portal/equipment?client_id=${clientId}`,
       "Failed to fetch records for export",
     );
   }
@@ -1951,17 +2563,17 @@ export const exportClientOnsiteSupportAction = async (formData: FormData) => {
   const recordCount = records?.length || 0;
   let filterText = "";
 
-  if (filterType === "date_range" && startDate && endDate) {
-    filterText = ` (${startDate} to ${endDate})`;
-  } else if (filterType === "month" && startDate) {
-    filterText = ` (${startDate.substring(0, 7)})`;
+  if (filterType === "status" && filterValue) {
+    filterText = ` (Status: ${filterValue})`;
+  } else if (filterType === "type" && filterValue) {
+    filterText = ` (Type: ${filterValue})`;
   } else if (filterType === "all") {
-    filterText = " (All Records)";
+    filterText = " (All Equipment)";
   }
 
   // Store the records in URL params to display them
   const recordsParam = encodeURIComponent(JSON.stringify(records || []));
-  const redirectUrl = `/client-portal/onsite-support?client_id=${clientId}&export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}`;
+  const redirectUrl = `/client-portal/equipment?client_id=${clientId}&export_results=${recordsParam}&filter_text=${encodeURIComponent(filterText)}&record_count=${recordCount}`;
 
   return redirect(redirectUrl);
 };

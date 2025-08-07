@@ -1,0 +1,266 @@
+import { redirect } from "next/navigation";
+import { createClient } from "../../../../supabase/server";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Monitor, Download, ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { ClientEquipmentTable } from "@/components/client-equipment-table";
+import { Toaster } from "@/components/ui/toaster";
+import { decrypt } from "@/utils/encryption";
+
+interface ClientEquipmentProps {
+  searchParams: Promise<{
+    client_id?: string;
+    role?: string;
+    session?: string;
+    export_results?: string;
+    filter_text?: string;
+    record_count?: string;
+  }>;
+}
+
+export default async function ClientEquipmentPage({
+  searchParams,
+}: ClientEquipmentProps) {
+  const params = await searchParams;
+  const clientId = params.client_id;
+  const userRole = params.role || "user";
+  const sessionToken = params.session;
+
+  if (!clientId || !sessionToken) {
+    return redirect("/client-portal");
+  }
+
+  // Check if user has admin role to access equipment page
+  if (userRole !== "admin") {
+    return redirect(
+      `/client-portal/dashboard?client_id=${clientId}&role=${userRole}&session=${encodeURIComponent(sessionToken)}`,
+    );
+  }
+
+  const supabase = await createClient();
+
+  // Verify session token
+  const { data: sessionData, error: sessionError } = await supabase
+    .from("client_sessions")
+    .select("*")
+    .eq("session_token", decodeURIComponent(sessionToken))
+    .eq("client_id", clientId)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+
+  if (sessionError || !sessionData) {
+    return redirect("/client-portal");
+  }
+
+  // Get client data
+  const { data: clientData, error } = await supabase
+    .from("client_credentials")
+    .select("*, companies(*), client_company_profiles(*)")
+    .eq("id", clientId)
+    .eq("is_active", true)
+    .single();
+
+  if (error || !clientData) {
+    return redirect("/client-portal");
+  }
+
+  // Get client's equipment based on their company profile
+  const clientCompanyProfileId = clientData.client_company_profile_id;
+
+  const { data: equipment } = await supabase
+    .from("equipment_inventory")
+    .select("*")
+    .eq("client_company_profile_id", clientCompanyProfileId)
+    .order("created_at", { ascending: false });
+
+  const equipmentStats = {
+    total: equipment?.length || 0,
+    active: equipment?.filter((e) => e.status === "active").length || 0,
+    inactive: equipment?.filter((e) => e.status === "inactive").length || 0,
+    maintenance:
+      equipment?.filter((e) => e.status === "maintenance").length || 0,
+  };
+
+  const decryptedEquipment = equipment?.map((e) => ({
+    ...e,
+    login_password: e.login_password ? decrypt(e.login_password) : null,
+  }));
+
+  return (
+    <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            // Enhanced security for client portal pages
+            (function() {
+              // Disable right-click context menu
+              document.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+              });
+              
+              // Disable keyboard shortcuts
+              document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'l' || e.key === 'L')) {
+                  e.preventDefault();
+                }
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U')) {
+                  e.preventDefault();
+                }
+                if (e.key === 'F12') {
+                  e.preventDefault();
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i')) {
+                  e.preventDefault();
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'J' || e.key === 'j')) {
+                  e.preventDefault();
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
+                  e.preventDefault();
+                }
+              });
+            })();
+          `,
+        }}
+      />
+      <div className="min-h-screen bg-gray-50">
+        <Toaster />
+        {/* Header */}
+        <header className="bg-white border-b">
+          <div className="container mx-auto px-4 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link
+                  href={`/client-portal/dashboard?client_id=${clientId}&role=${userRole}&session=${encodeURIComponent(sessionToken)}`}
+                >
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Dashboard
+                  </Button>
+                </Link>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <Monitor className="h-6 w-6" />
+                    Equipment Inventory
+                  </h1>
+                  <p className="text-gray-600">
+                    {clientData.companies?.name} - Your IT Equipment
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-8">
+          <div className="space-y-8">
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">
+                        Total Equipment
+                      </p>
+                      <p className="text-2xl font-bold">
+                        {equipmentStats.total}
+                      </p>
+                    </div>
+                    <Monitor className="h-8 w-8 text-gray-400" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">
+                        Active
+                      </p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {equipmentStats.active}
+                      </p>
+                    </div>
+                    <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <div className="h-3 w-3 bg-green-500 rounded-full"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">
+                        Inactive
+                      </p>
+                      <p className="text-2xl font-bold text-gray-600">
+                        {equipmentStats.inactive}
+                      </p>
+                    </div>
+                    <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
+                      <div className="h-3 w-3 bg-gray-500 rounded-full"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">
+                        Maintenance
+                      </p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {equipmentStats.maintenance}
+                      </p>
+                    </div>
+                    <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
+                      <div className="h-3 w-3 bg-orange-500 rounded-full"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Equipment Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Equipment</CardTitle>
+                <CardDescription>
+                  View your IT equipment and device inventory
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {!equipment || equipment.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Monitor className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No equipment found
+                    </h3>
+                    <p className="text-gray-600">
+                      No equipment has been assigned to your account yet.
+                    </p>
+                  </div>
+                ) : (
+                  <ClientEquipmentTable
+                    equipment={decryptedEquipment || []}
+                    showDownloadButton={true}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    </>
+  );
+}

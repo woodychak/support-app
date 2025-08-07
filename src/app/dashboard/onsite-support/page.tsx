@@ -58,11 +58,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  OnsiteSupportExport,
-  ExportResults,
-} from "@/components/onsite-support-export";
+import { OnsiteSupportExport } from "@/components/onsite-support-export";
 
+import Link from "next/link";
 
 interface OnsiteSupportPageProps {
   searchParams: Promise<
@@ -70,6 +68,7 @@ interface OnsiteSupportPageProps {
       export_results?: string;
       filter_text?: string;
       record_count?: string;
+      filter?: string;
     }
   >;
 }
@@ -79,6 +78,7 @@ export default async function OnsiteSupportPage({
 }: OnsiteSupportPageProps) {
   const supabase = await createClient();
   const message = await searchParams;
+  const currentFilter = message.filter || "this_month";
 
   const {
     data: { user },
@@ -99,30 +99,63 @@ export default async function OnsiteSupportPage({
     return redirect("/dashboard/company");
   }
 
-  // Get existing onsite support records
-  const { data: onsiteRecords } = await supabase
+  // Build query with date filtering based on current filter
+  let query = supabase
     .from("onsite_support")
     .select(
       `
       *,
-      client_credentials(
+      client_company_profiles(
         id,
-        username,
-        full_name,
-        email
+        company_name,
+        contact_person,
+        contact_email
       )
     `,
     )
     .eq("company_id", userData.company_id)
     .order("work_date", { ascending: false });
 
-  // Get clients for dropdown
-  const { data: clients } = await supabase
-    .from("client_credentials")
-    .select("id, username, full_name, email")
-    .eq("company_id", userData.company_id)
-    .eq("is_active", true)
-    .order("full_name", { ascending: true });
+  // Apply date filters
+  const currentDate = new Date();
+  if (currentFilter === "this_month") {
+    const startOfMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1,
+    );
+    const endOfMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      0,
+    );
+    query = query
+      .gte("work_date", startOfMonth.toISOString().split("T")[0])
+      .lte("work_date", endOfMonth.toISOString().split("T")[0]);
+  } else if (currentFilter === "last_month") {
+    const startOfLastMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() - 1,
+      1,
+    );
+    const endOfLastMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      0,
+    );
+    query = query
+      .gte("work_date", startOfLastMonth.toISOString().split("T")[0])
+      .lte("work_date", endOfLastMonth.toISOString().split("T")[0]);
+  }
+  // For "all", no additional filters are applied
+
+  const { data: onsiteRecords } = await query;
+
+  // Get client company profiles for dropdown
+  const { data: clientCompanyProfiles } = await supabase
+    .from("client_company_profiles")
+    .select("id, company_name, contact_person, contact_email")
+    .order("company_name", { ascending: true });
 
   // Calculate total hours for each record
   const recordsWithHours = onsiteRecords?.map((record) => {
@@ -139,39 +172,12 @@ export default async function OnsiteSupportPage({
   // Get current date for default value
   const today = new Date().toISOString().split("T")[0];
 
-  // Calculate total hours for current month
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
-
-  const currentMonthHours =
+  // Calculate total hours for the filtered period
+  const filteredHours =
     recordsWithHours?.reduce((total, record) => {
-      const recordDate = new Date(record.work_date);
-      if (
-        recordDate.getMonth() === currentMonth &&
-        recordDate.getFullYear() === currentYear
-      ) {
-        const hours = parseFloat(record.totalHours || "0");
-        return total + (isNaN(hours) ? 0 : hours);
-      }
-      return total;
+      const hours = parseFloat(record.totalHours || "0");
+      return total + (isNaN(hours) ? 0 : hours);
     }, 0) || 0;
-
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
-  const currentMonthName = monthNames[currentMonth];
 
   // Parse export results if available
   const exportResults = message.export_results
@@ -204,9 +210,9 @@ export default async function OnsiteSupportPage({
               <Wrench className="h-8 w-8" />
               Onsite Support Management
             </h1>
-            <p className="text-muted-foreground">
+            <span className="text-muted-foreground">
               Track engineer onsite support activities and generate reports.
-            </p>
+            </span>
           </header>
 
           {/* Add New Record */}
@@ -267,18 +273,20 @@ export default async function OnsiteSupportPage({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="client_id">Client (required)</Label>
-                  <Select name="client_id" required>
+                  <Label htmlFor="client_company_profile_id">
+                    Client Company (required)
+                  </Label>
+                  <Select name="client_company_profile_id" required>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a client" />
+                      <SelectValue placeholder="Select a client company" />
                     </SelectTrigger>
                     <SelectContent>
-                      {clients?.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.full_name || client.username}
-                          {client.email && (
+                      {clientCompanyProfiles?.map((profile) => (
+                        <SelectItem key={profile.id} value={profile.id}>
+                          {profile.company_name}
+                          {profile.contact_person && (
                             <span className="text-xs text-gray-500 ml-2">
-                              ({client.email})
+                              ({profile.contact_person})
                             </span>
                           )}
                         </SelectItem>
@@ -314,26 +322,149 @@ export default async function OnsiteSupportPage({
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Onsite Support Records</span>
-                <div className="flex items-center gap-2 text-sm bg-blue-50 px-3 py-1 rounded-lg">
-                  <Timer className="h-4 w-4 text-blue-600" />
-                  <span className="font-medium text-blue-900">
-                    {currentMonthHours.toFixed(1)}h this month
-                  </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-sm bg-blue-50 px-3 py-1 rounded-lg">
+                    <Timer className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-blue-900">
+                      {filteredHours.toFixed(1)}h{" "}
+                      {currentFilter === "this_month"
+                        ? "this month"
+                        : currentFilter === "last_month"
+                          ? "last month"
+                          : "total"}
+                    </span>
+                  </div>
+                  <form
+                    action="/api/download/admin-onsite-excel"
+                    method="POST"
+                    className="inline"
+                  >
+                    <input type="hidden" name="filter_type" value="current" />
+                    {currentFilter === "this_month" && (
+                      <>
+                        <input
+                          type="hidden"
+                          name="start_date"
+                          value={
+                            new Date(
+                              new Date().getFullYear(),
+                              new Date().getMonth(),
+                              1,
+                            )
+                              .toISOString()
+                              .split("T")[0]
+                          }
+                        />
+                        <input
+                          type="hidden"
+                          name="end_date"
+                          value={
+                            new Date(
+                              new Date().getFullYear(),
+                              new Date().getMonth() + 1,
+                              0,
+                            )
+                              .toISOString()
+                              .split("T")[0]
+                          }
+                        />
+                      </>
+                    )}
+                    {currentFilter === "last_month" && (
+                      <>
+                        <input
+                          type="hidden"
+                          name="start_date"
+                          value={
+                            new Date(
+                              new Date().getFullYear(),
+                              new Date().getMonth() - 1,
+                              1,
+                            )
+                              .toISOString()
+                              .split("T")[0]
+                          }
+                        />
+                        <input
+                          type="hidden"
+                          name="end_date"
+                          value={
+                            new Date(
+                              new Date().getFullYear(),
+                              new Date().getMonth(),
+                              0,
+                            )
+                              .toISOString()
+                              .split("T")[0]
+                          }
+                        />
+                      </>
+                    )}
+                    <Button type="submit" size="sm" variant="outline">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Download Excel
+                    </Button>
+                  </form>
                 </div>
               </CardTitle>
-              <CardDescription>
-                {recordsWithHours?.length || 0} support records on file •{" "}
-                {currentMonthName} {currentYear} total hours
+              <CardDescription className="flex items-center justify-between">
+                <span>
+                  {recordsWithHours?.length || 0} support records on file •{" "}
+                  {currentFilter === "this_month" &&
+                    new Date().toLocaleDateString("en-US", {
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  {currentFilter === "last_month" &&
+                    new Date(
+                      new Date().getFullYear(),
+                      new Date().getMonth() - 1,
+                    ).toLocaleDateString("en-US", {
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  {currentFilter === "all" && "All time"}
+                </span>
+                <div className="flex gap-2">
+                  <Link href="/dashboard/onsite-support?filter=all">
+                    <Button
+                      variant={currentFilter === "all" ? "default" : "outline"}
+                      size="sm"
+                    >
+                      All
+                    </Button>
+                  </Link>
+                  <Link href="/dashboard/onsite-support?filter=last_month">
+                    <Button
+                      variant={
+                        currentFilter === "last_month" ? "default" : "outline"
+                      }
+                      size="sm"
+                    >
+                      Last Month
+                    </Button>
+                  </Link>
+                  <Link href="/dashboard/onsite-support?filter=this_month">
+                    <Button
+                      variant={
+                        currentFilter === "this_month" ? "default" : "outline"
+                      }
+                      size="sm"
+                    >
+                      This Month
+                    </Button>
+                  </Link>
+                </div>
               </CardDescription>
             </CardHeader>
             <CardContent>
               {!recordsWithHours || recordsWithHours.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Wrench className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No onsite support records yet.</p>
-                  <p className="text-sm">
+                  <span>No onsite support records yet.</span>
+                  <span className="text-sm">
                     Add your first support record above.
-                  </p>
+                  </span>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -373,10 +504,9 @@ export default async function OnsiteSupportPage({
                           </td>
                           <td className="p-3">
                             <div className="text-sm">
-                              {record.client_credentials ? (
+                              {record.client_company_profiles ? (
                                 <span>
-                                  {record.client_credentials.full_name ||
-                                    record.client_credentials.username}
+                                  {record.client_company_profiles.company_name}
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground">-</span>
@@ -420,33 +550,39 @@ export default async function OnsiteSupportPage({
                             )}
                           </td>
                           <td className="p-3 max-w-xs">
-  {record.job_details ? (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button
-          className="text-sm text-muted-foreground underline hover:text-primary truncate w-full text-left"
-          title="Click to view full job details"
-        >
-          {record.job_details.slice(0, 30)}...
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Job Details</DialogTitle>
-          <DialogDescription>
-            Full job description for {record.engineer_name} on{" "}
-            {new Date(record.work_date).toLocaleDateString()}.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="whitespace-pre-line text-sm text-gray-700">
-          {record.job_details}
-        </div>
-      </DialogContent>
-    </Dialog>
-  ) : (
-    <span className="text-muted-foreground text-sm">-</span>
-  )}
-</td>
+                            {record.job_details ? (
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <button
+                                    className="text-sm text-muted-foreground underline hover:text-primary truncate w-full text-left"
+                                    title="Click to view full job details"
+                                  >
+                                    {record.job_details.slice(0, 30)}...
+                                  </button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-xl">
+                                  <DialogHeader>
+                                    <DialogTitle>Job Details</DialogTitle>
+                                    <DialogDescription>
+                                      Full job description for{" "}
+                                      {record.engineer_name} on{" "}
+                                      {new Date(
+                                        record.work_date,
+                                      ).toLocaleDateString()}
+                                      .
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="whitespace-pre-line text-sm text-gray-700">
+                                    {record.job_details}
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">
+                                -
+                              </span>
+                            )}
+                          </td>
                           <td className="p-3">
                             <div className="flex gap-2">
                               {/* Edit Dialog */}
@@ -537,36 +673,40 @@ export default async function OnsiteSupportPage({
                                     </div>
 
                                     <div className="space-y-2">
-                                      <Label htmlFor={`client_id_${record.id}`}>
-                                        Client (Optional)
+                                      <Label
+                                        htmlFor={`client_company_profile_id_${record.id}`}
+                                      >
+                                        Client Company (Optional)
                                       </Label>
                                       <Select
-                                        name="client_id"
+                                        name="client_company_profile_id"
                                         defaultValue={
-                                          record.client_credential_id || "none"
+                                          record.client_company_profile_id ||
+                                          "none"
                                         }
                                       >
                                         <SelectTrigger>
-                                          <SelectValue placeholder="Select a client (optional)" />
+                                          <SelectValue placeholder="Select a client company (optional)" />
                                         </SelectTrigger>
                                         <SelectContent>
                                           <SelectItem value="none">
-                                            No specific client
+                                            No specific client company
                                           </SelectItem>
-                                          {clients?.map((client) => (
-                                            <SelectItem
-                                              key={client.id}
-                                              value={client.id}
-                                            >
-                                              {client.full_name ||
-                                                client.username}
-                                              {client.email && (
-                                                <span className="text-xs text-gray-500 ml-2">
-                                                  ({client.email})
-                                                </span>
-                                              )}
-                                            </SelectItem>
-                                          ))}
+                                          {clientCompanyProfiles?.map(
+                                            (profile) => (
+                                              <SelectItem
+                                                key={profile.id}
+                                                value={profile.id}
+                                              >
+                                                {profile.company_name}
+                                                {profile.contact_person && (
+                                                  <span className="text-xs text-gray-500 ml-2">
+                                                    ({profile.contact_person})
+                                                  </span>
+                                                )}
+                                              </SelectItem>
+                                            ),
+                                          )}
                                         </SelectContent>
                                       </Select>
                                     </div>
@@ -649,16 +789,6 @@ export default async function OnsiteSupportPage({
               )}
             </CardContent>
           </Card>
-
-          {/* Export Section */}
-          <OnsiteSupportExport />
-
-          {/* Export Results */}
-          <ExportResults
-            exportResults={exportResults}
-            filterText={filterText}
-            recordCount={recordCount}
-          />
         </div>
       </main>
     </>

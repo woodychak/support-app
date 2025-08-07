@@ -40,7 +40,7 @@ import { ClickableImage } from "@/components/clickable-image";
 
 interface TicketDetailPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ client_id?: string } & Message>;
+  searchParams: Promise<{ client_id?: string; session?: string } & Message>;
 }
 // 1️⃣ 先定義 attachment 的 Row 型別
 type TicketAttachment = {
@@ -58,12 +58,26 @@ export default async function TicketDetailPage({
   const { id } = await params;
   const searchParamsData = await searchParams;
   const clientId = searchParamsData.client_id;
+  const sessionToken = searchParamsData.session;
 
-  if (!clientId) {
+  if (!clientId || !sessionToken) {
     return redirect("/client-portal");
   }
 
   const supabase = await createClient();
+
+  // Verify session token
+  const { data: sessionData, error: sessionError } = await supabase
+    .from("client_sessions")
+    .select("*")
+    .eq("session_token", decodeURIComponent(sessionToken))
+    .eq("client_id", clientId)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+
+  if (sessionError || !sessionData) {
+    return redirect("/client-portal");
+  }
 
   // Get client data
   const { data: clientData, error: clientError } = await supabase
@@ -86,7 +100,9 @@ export default async function TicketDetailPage({
     .single();
 
   if (ticketError || !ticket) {
-    return redirect(`/client-portal/dashboard?client_id=${clientId}`);
+    return redirect(
+      `/client-portal/dashboard?client_id=${clientId}&session=${encodeURIComponent(sessionToken)}`,
+    );
   }
 
   // Get ticket comments
@@ -140,13 +156,50 @@ export default async function TicketDetailPage({
 
   return (
     <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            // Enhanced security for client portal pages
+            (function() {
+              // Disable right-click context menu
+              document.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+              });
+              
+              // Disable keyboard shortcuts
+              document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'l' || e.key === 'L')) {
+                  e.preventDefault();
+                }
+                if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U')) {
+                  e.preventDefault();
+                }
+                if (e.key === 'F12') {
+                  e.preventDefault();
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i')) {
+                  e.preventDefault();
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'J' || e.key === 'j')) {
+                  e.preventDefault();
+                }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'C' || e.key === 'c')) {
+                  e.preventDefault();
+                }
+              });
+            })();
+          `,
+        }}
+      />
       <ImageViewerWrapper />
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <header className="bg-white border-b">
           <div className="container mx-auto px-4 py-6">
             <div className="flex items-center gap-4">
-              <Link href={`/client-portal/dashboard?client_id=${clientId}`}>
+              <Link
+                href={`/client-portal/dashboard?client_id=${clientId}&session=${encodeURIComponent(sessionToken)}`}
+              >
                 <Button variant="ghost" size="icon">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
@@ -225,16 +278,16 @@ export default async function TicketDetailPage({
                         className="border-l-4 border-blue-200 pl-4"
                       >
                         <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium">
-                            {comment.author_type === "client"
-                              ? "You"
-                              : "Support Team"}
-                          </span>
-                          <span className="text-sm text-gray-500">
-                            {new Date(comment.created_at).toLocaleString()}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4 text-gray-500" />
+                            <span className="font-medium">
+                              {comment.author_type === "client"
+                                ? "You"
+                                : "Support Team"}
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              {new Date(comment.created_at).toLocaleString()}
+                            </span>
                           </div>
                           {comment.author_type === "client" &&
                             comment.author_id === clientId && (
@@ -380,7 +433,7 @@ export default async function TicketDetailPage({
                     <div className="flex gap-4">
                       <Button type="submit">Update Ticket</Button>
                       <Link
-                        href={`/client-portal/dashboard?client_id=${clientId}`}
+                        href={`/client-portal/dashboard?client_id=${clientId}&session=${encodeURIComponent(sessionToken)}`}
                       >
                         <Button variant="outline">Back to Dashboard</Button>
                       </Link>
@@ -400,7 +453,7 @@ export default async function TicketDetailPage({
                       {ticket.status}.
                     </p>
                     <Link
-                      href={`/client-portal/dashboard?client_id=${clientId}`}
+                      href={`/client-portal/dashboard?client_id=${clientId}&session=${encodeURIComponent(sessionToken)}`}
                     >
                       <Button variant="outline" className="mt-4">
                         Back to Dashboard

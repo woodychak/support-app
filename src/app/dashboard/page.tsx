@@ -7,6 +7,7 @@ import {
   Ticket,
   Plus,
   Wrench,
+  Monitor,
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "../../../supabase/server";
@@ -166,6 +167,12 @@ export default async function Dashboard() {
                       <Button variant="outline">
                         <UserCircle className="h-4 w-4 mr-2" />
                         Staff Management
+                      </Button>
+                    </Link>
+                    <Link href="/dashboard/equipment">
+                      <Button variant="outline">
+                        <Monitor className="h-4 w-4 mr-2" />
+                        Equipment Inventory
                       </Button>
                     </Link>
                   </div>
