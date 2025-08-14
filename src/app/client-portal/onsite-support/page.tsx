@@ -23,6 +23,7 @@ import ClientOnsiteSupportTable from "@/components/ClientOnsiteSupportTable";
 interface ClientOnsiteSupportPageProps {
   searchParams: Promise<{
     client_id?: string;
+    role?: string;
     session?: string;
     export_results?: string;
     filter_text?: string;
@@ -36,6 +37,7 @@ export default async function ClientOnsiteSupportPage({
 }: ClientOnsiteSupportPageProps) {
   const params = await searchParams;
   const clientId = params.client_id;
+  const userRole = params.role || "user";
   const sessionToken = params.session;
   const currentFilter = params.filter || "this_month";
 
@@ -170,7 +172,7 @@ export default async function ClientOnsiteSupportPage({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Link
-                  href={`/client-portal/dashboard?client_id=${clientId}&session=${encodeURIComponent(sessionToken)}`}
+                  href={`/client-portal/dashboard?client_id=${clientId}&role=${userRole}&session=${encodeURIComponent(sessionToken)}`}
                 >
                   <Button variant="outline" size="sm">
                     <ArrowLeft className="h-4 w-4 mr-2" />
@@ -315,7 +317,7 @@ export default async function ClientOnsiteSupportPage({
                   </span>
                   <div className="flex gap-2">
                     <Link
-                      href={`/client-portal/onsite-support?client_id=${clientId}&session=${encodeURIComponent(sessionToken)}&filter=all`}
+                      href={`/client-portal/onsite-support?client_id=${clientId}&role=${userRole}&session=${encodeURIComponent(sessionToken)}&filter=all`}
                     >
                       <Button
                         variant={
@@ -327,7 +329,7 @@ export default async function ClientOnsiteSupportPage({
                       </Button>
                     </Link>
                     <Link
-                      href={`/client-portal/onsite-support?client_id=${clientId}&session=${encodeURIComponent(sessionToken)}&filter=last_month`}
+                      href={`/client-portal/onsite-support?client_id=${clientId}&role=${userRole}&session=${encodeURIComponent(sessionToken)}&filter=last_month`}
                     >
                       <Button
                         variant={
@@ -339,7 +341,7 @@ export default async function ClientOnsiteSupportPage({
                       </Button>
                     </Link>
                     <Link
-                      href={`/client-portal/onsite-support?client_id=${clientId}&session=${encodeURIComponent(sessionToken)}&filter=this_month`}
+                      href={`/client-portal/onsite-support?client_id=${clientId}&role=${userRole}&session=${encodeURIComponent(sessionToken)}&filter=this_month`}
                     >
                       <Button
                         variant={

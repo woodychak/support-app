@@ -226,7 +226,7 @@ export default async function ClientDashboard({
                   </Button>
                 </Link>
                 <Link
-                  href={`/client-portal/onsite-support?client_id=${clientId}&session=${encodeURIComponent(sessionToken)}`}
+                  href={`/client-portal/onsite-support?client_id=${clientId}&role=${userRole}&session=${encodeURIComponent(sessionToken)}`}
                 >
                   <Button variant="outline">
                     <FileText className="h-4 w-4 mr-2" />
