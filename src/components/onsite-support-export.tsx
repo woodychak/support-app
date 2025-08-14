@@ -37,8 +37,7 @@ export function OnsiteSupportExport() {
       </CardHeader>
       <CardContent>
         <form
-          action={downloadAdminOnsiteExcelAction}
-          method="POST"
+          action="/api/client-onsite-excel" method="POST"
           className="space-y-4"
         >
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

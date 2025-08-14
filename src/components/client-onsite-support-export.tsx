@@ -45,8 +45,7 @@ export function ClientOnsiteSupportExport({
       </CardHeader>
       <CardContent>
         <form
-          action={downloadClientOnsiteExcelAction}
-          method="POST"
+          action="/api/client-onsite-excel" method="POST"
           className="space-y-4"
         >
           <input type="hidden" name="client_id" value={clientId} />
